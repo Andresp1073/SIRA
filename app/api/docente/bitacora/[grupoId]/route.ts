@@ -13,13 +13,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ grupoId
     const group = await db.group.findFirst({
       where: {
         id: groupId,
-        teachers: { some: { teacherId: session.user.id  } },
+        teachers: { some: { teacherId: session.user.id } },
       },
       include: {
         subject: { select: { name: true, code: true } },
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },
         room: { select: { name: true } },
         teachers: { include: { teacher: { select: { name: true, institutionalEmail: true } } } },
+        _count: { select: { students: true } },
         planning: {
           include: {
             weeks: {
@@ -36,7 +37,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ grupoId
       },
     });
     if (!group) return NextResponse.json({ error: 'Grupo no encontrado o no autorizado' }, { status: 404 });
-    return NextResponse.json(group);
+    const { _count, ...groupData } = group;
+    return NextResponse.json({ ...groupData, studentCount: _count.students, studentIds: [] });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }

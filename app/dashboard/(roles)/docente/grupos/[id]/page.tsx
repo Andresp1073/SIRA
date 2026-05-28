@@ -203,7 +203,7 @@ export default function GrupoDetailPage() {
             <Button
               variant="outline"
               className="w-full sm:w-auto rounded-xl shadow-none h-10 border-transparent bg-muted/40 hover:bg-muted/60 transition-colors sm:text-sm text-xs font-medium gap-2"
-              onClick={() => router.push(`/dashboard/docente/grupos/${grupoId}/preview`)}
+              onClick={() => window.location.href = `/dashboard/docente/grupos/${grupoId}/preview`}
             >
               <Eye className="h-4 w-4" />
               Vista previa

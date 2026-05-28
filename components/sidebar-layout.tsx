@@ -408,27 +408,26 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
   const breadcrumbLinks = React.useMemo(() => {
     if (!userRole) return [];
 
-    // Función para aplanar todos los enlaces, incluyendo los subLinks
+    // Función para aplanar todos los enlaces recursivamente, incluyendo subLinks anidados
     const getAllLinks = () => {
+      const flatten = (links: any[], parentHref?: string): any[] => {
+        return links.flatMap(link => {
+          const item = {
+            ...link,
+            parentHref: parentHref ?? null,
+            isSubLink: !!parentHref,
+          };
+          const children = link.subLinks
+            ? flatten(
+                link.subLinks.filter((sl: any) => sl.roles.includes(userRole)),
+                link.href
+              )
+            : [];
+          return [item, ...children];
+        });
+      };
       return navLinkGroups.flatMap(group =>
-        group.links
-          .filter(link => link.roles.includes(userRole))
-          .flatMap(link => {
-            const result = [{ ...link, isSubLink: false }];
-            if (link.subLinks) {
-              result.push(
-                ...link.subLinks
-                  .filter(subLink => subLink.roles.includes(userRole))
-                  .map(subLink => ({
-                    ...subLink,
-                    parentHref: link.href,
-                    isSubLink: true,
-                    icon: subLink.icon || link.icon, // Provide a fallback icon from parent
-                  }))
-              );
-            }
-            return result;
-          })
+        flatten(group.links.filter(link => link.roles.includes(userRole)))
       );
     };
 
@@ -463,43 +462,39 @@ export default function SidebarLayout({ children }: { children: React.ReactNode 
 
     if (!currentLink) return crumbs;
 
-    // Si es un subLink, añadimos primero su padre
-    if (currentLink.isSubLink && currentLink.parentHref) {
-      const parentLink = allLinks.find(
-        link => !link.isSubLink && link.href === currentLink.parentHref
-      );
-      if (parentLink) {
+    // Build breadcrumb chain by following parentHref up to a top-level link
+    const addParentChain = (link: typeof currentLink) => {
+      if (!link.isSubLink || !link.parentHref) return;
+      const parent = allLinks.find(l => l.href === link.parentHref);
+      if (parent) {
+        addParentChain(parent);
         crumbs.push({
-          href: resolveHref(parentLink.href, pathname),
-          label: parentLink.label,
+          href: resolveHref(parent.href, pathname),
+          label: parent.label,
         });
       }
-    }
-    // Si no es un subLink pero tiene subLinks, lo añadimos directamente
-    else if (!currentLink.isSubLink) {
-      // Solo lo añadimos si no es el home
-      if (currentLink.href !== homePath) {
-        crumbs.push({
-          href: resolveHref(currentLink.href, pathname),
-          label: currentLink.label,
-        });
-      }
+    };
+
+    if (currentLink.isSubLink) {
+      addParentChain(currentLink);
+    } else if (currentLink.href !== homePath) {
+      crumbs.push({
+        href: resolveHref(currentLink.href, pathname),
+        label: currentLink.label,
+      });
     }
 
-    // Finalmente, si es un subLink o la ruta actual es un subLink, lo añadimos
+    // Add the current page as last breadcrumb
     if (currentLink.isSubLink || (currentLink.subLinks && pathname !== currentLink.href)) {
-      // Buscar si hay un subLink activo
-      const activeSubLink = currentLink.subLinks?.find(
-        subLink => isMatchingRoute(subLink.href, pathname)
+      const activeSubLink = currentLink.subLinks?.find((subLink: { href: string }) =>
+        isMatchingRoute(subLink.href, pathname)
       );
-
       if (activeSubLink) {
         crumbs.push({
           href: resolveHref(activeSubLink.href, pathname),
           label: activeSubLink.label,
         });
       } else if (currentLink.isSubLink) {
-        // Si es un subLink y no hemos encontrado otro subLink más específico
         crumbs.push({
           href: resolveHref(currentLink.href, pathname),
           label: currentLink.label,

@@ -1,5 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/prisma';
+import { parseLocalDate } from '@/lib/date-utils';
 import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
 
@@ -35,8 +36,8 @@ export async function POST(req: Request) {
       data: {
         name,
         type,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: parseLocalDate(startDate),
+        endDate: parseLocalDate(endDate),
         yearId,
       },
     });

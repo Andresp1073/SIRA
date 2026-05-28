@@ -102,8 +102,8 @@ export function useStudentDashboard() {
       }
       return response.json();
     },
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchInterval: 2 * 60 * 1000,
     retry: 1,
   });
 

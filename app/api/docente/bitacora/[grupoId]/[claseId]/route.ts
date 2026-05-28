@@ -118,12 +118,16 @@ export async function POST(
       }
     }
 
-    // 2. Prepare class update data
+    // 2. Prepare class update data — preserve existing status when not changing it
     const updateData: any = {
-      status: classStatus || 'SCHEDULED',
-      cancellationReason: cancellationReason ?? null,
-      topic: executedTopic || plannedTopic || currentClass.topic, // Sync Class.topic with logbook
+      topic: executedTopic || plannedTopic || currentClass.topic,
     };
+    if (classStatus) {
+      updateData.status = classStatus;
+      if (classStatus === 'CANCELLED') {
+        updateData.cancellationReason = cancellationReason ?? null;
+      }
+    }
 
     // 3. Handle Date and Time updates
     const baseDate = fecha ? new Date(fecha) : new Date(currentClass.date);

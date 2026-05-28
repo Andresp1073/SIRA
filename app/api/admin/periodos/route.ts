@@ -1,5 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/prisma';
+import { parseLocalDate } from '@/lib/date-utils';
 import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
 
@@ -30,8 +31,8 @@ export async function POST(req: Request) {
     const period = await db.academicPeriod.create({
       data: {
         name: body.name,
-        startDate: new Date(body.startDate),
-        endDate: new Date(body.endDate),
+        startDate: parseLocalDate(body.startDate),
+        endDate: parseLocalDate(body.endDate),
         isActive: body.isActive ?? true,
       },
     });
@@ -55,8 +56,8 @@ export async function PUT(req: Request) {
       where: { id },
       data: {
         ...(name && { name }),
-        ...(startDate && { startDate: new Date(startDate) }),
-        ...(endDate && { endDate: new Date(endDate) }),
+        ...(startDate && { startDate: parseLocalDate(startDate) }),
+        ...(endDate && { endDate: parseLocalDate(endDate) }),
         ...(typeof isActive === 'boolean' && { isActive }),
         ...(yearId !== undefined && { yearId }),
       },

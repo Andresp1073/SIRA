@@ -68,7 +68,8 @@ export function useClassManagement({
           })
         );
       }
-      sileo.success({ title: `La clase ha sido marcada como ${status.toLowerCase()}.` });
+      const statusLabel = status === 'SIGNED' ? 'firmada' : status.toLowerCase();
+      sileo.success({ title: `Clase ${statusLabel} exitosamente.` });
 
       // Invalidar queries de React Query si existe subjectId
       if (subjectId) {

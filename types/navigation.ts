@@ -20,6 +20,7 @@ export interface NavSubLink extends NavLinkBase {
   icon?: LucideIcon;
   isSubLink: true;
   parentHref: string;
+  subLinks?: NavSubLink[];
 }
 
 export interface NavLinkGroup {

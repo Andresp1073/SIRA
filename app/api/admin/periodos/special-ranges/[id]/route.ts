@@ -1,5 +1,6 @@
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/prisma';
+import { parseLocalDate } from '@/lib/date-utils';
 import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
 
@@ -19,8 +20,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       data: {
         ...(name && { name }),
         ...(type && { type }),
-        ...(startDate && { startDate: new Date(startDate) }),
-        ...(endDate && { endDate: new Date(endDate) }),
+        ...(startDate && { startDate: parseLocalDate(startDate) }),
+        ...(endDate && { endDate: parseLocalDate(endDate) }),
       },
     });
 

@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, isAfter, startOfToday } from 'date-fns';
-import { BookOpen, CalendarDays, Clock, Save } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarDays, Clock, Save } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { sileo } from 'sileo';
@@ -33,7 +33,7 @@ interface GrupoData {
   schedule: { startTime: string; endTime: string } | null;
   room: { name: string } | null;
   teachers: { name: string; institutionalEmail: string | null }[];
-  studentIds: string[];
+  studentCount: number;
   planning: {
     id: string;
     startDate: string;
@@ -146,11 +146,9 @@ export default function BitacoraTablaPage() {
             body: JSON.stringify({
               plannedTopic: row.tema,
               executedTopic: row.tema,
-              classStatus: 'SCHEDULED',
               fecha: newDate.toISOString(),
               horaInicio: row.horaInicio,
               horaFin: row.horaFin,
-              asistencias: [],
             }),
           });
         })
@@ -191,13 +189,24 @@ export default function BitacoraTablaPage() {
       {/* Nav */}
       <div className="pb-6 w-full flex flex-col gap-3">
         <div className="flex sm:flex-row flex-col sm:items-center items-start gap-4 justify-between">
-          <div>
-            <h1 className="sm:text-2xl text-xl font-semibold tracking-card text-foreground">
-              Planeador Docente
-            </h1>
-            <CardDescription className="text-xs dark:text-gray-300">
-              Gestiona los temas de tus clases en el planeador.
-            </CardDescription>
+          <div className="flex flex-col gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-fit rounded-xl gap-1.5 text-xs -ml-2"
+              onClick={() => router.push(`/dashboard/docente/grupos/${grupoId}`)}
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Detalle del Grupo
+            </Button>
+            <div>
+              <h1 className="sm:text-2xl text-xl font-semibold tracking-card text-foreground">
+                Planeador Docente
+              </h1>
+              <CardDescription className="text-xs dark:text-gray-300">
+                Gestiona los temas de tus clases en el planeador.
+              </CardDescription>
+            </div>
           </div>
           <Button
             size="default"
@@ -268,7 +277,7 @@ export default function BitacoraTablaPage() {
               <span className="text-[10px] font-semibold tracking-card text-muted-foreground uppercase">
                 Estudiantes
               </span>
-              <span className="font-medium text-foreground">{data.studentIds.length}</span>
+                <span className="font-medium text-foreground">{data.studentCount}</span>
             </div>
           </div>
         </div>
