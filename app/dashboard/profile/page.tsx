@@ -479,7 +479,7 @@ export default function ProfilePage() {
 
         <TabsContent value="profile" className="space-y-4">
           {/* Resumen del usuario */}
-          <Card className="p-0">
+          <Card className="p-0 border-border shadow-sm">
             <CardContent className="py-4 px-5 flex items-center gap-4">
               <Avatar className="h-12 w-12 border border-border bg-muted shrink-0">
                 <AvatarFallback className="text-lg font-semibold text-primary">
@@ -495,7 +495,7 @@ export default function ProfilePage() {
 
           <Form {...profileForm}>
             <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
-              <Card className="p-0">
+              <Card className="p-0 border-border shadow-sm">
                 <CardHeader className="border-b px-5 py-4">
                   <CardTitle className="sm:text-sm text-xs font-semibold">Información de Perfil</CardTitle>
                   <CardDescription className="text-xs">
@@ -620,7 +620,7 @@ export default function ProfilePage() {
         <TabsContent value="security" className="space-y-4">
           <Form {...passwordForm}>
             <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-              <Card className="p-0">
+              <Card className="p-0 border-border shadow-sm">
                 <CardHeader className="border-b px-5 py-4">
                   <CardTitle className="sm:text-sm text-xs font-semibold">Cambiar Contraseña</CardTitle>
                   <CardDescription className="text-xs">
@@ -702,7 +702,7 @@ export default function ProfilePage() {
           <TabsContent value="signature" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Preview principal */}
-              <Card className="lg:col-span-1 lg:row-span-2">
+              <Card className="lg:col-span-1 lg:row-span-2 border-border shadow-sm">
                 <CardHeader className="px-5 pt-5 pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
                     <PenLine className="h-4 w-4 text-primary" />
@@ -776,7 +776,7 @@ export default function ProfilePage() {
               </Card>
 
               {/* Subir imagen */}
-              <Card className="lg:col-span-2">
+              <Card className="lg:col-span-2 border-border shadow-sm">
                 <CardHeader className="px-5 pt-5 pb-3">
                   <CardTitle className="text-sm font-semibold">Subir imagen</CardTitle>
                   <CardDescription className="text-xs">
@@ -791,7 +791,7 @@ export default function ProfilePage() {
               </Card>
 
               {/* Dibujar */}
-              <Card className="lg:col-span-2">
+              <Card className="lg:col-span-2 border-border shadow-sm">
                 <CardHeader className="px-5 pt-5 pb-3">
                   <CardTitle className="text-sm font-semibold">Dibujar a mano</CardTitle>
                   <CardDescription className="text-xs">
