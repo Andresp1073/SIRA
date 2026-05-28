@@ -296,7 +296,7 @@ export default function ProgramacionPage() {
       } else {
         const s = data.summary;
         sileo.success({
-          description: `✅ Horarios: ${s.createdHorarios} · Grupos creados: ${s.createdGrupos} · Actualizados: ${s.updatedGrupos} · Errores: ${s.errors}`,
+          title: `Programación procesada: ${s.createdGrupos} grupos creados, ${s.updatedGrupos} actualizados, ${s.errors} errores`,
         });
         setFile(null);
         setPreviewData([]);

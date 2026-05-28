@@ -138,7 +138,7 @@ export default function PlaneacionPage() {
         sileo.error({ description: data.error ?? 'Error al generar planeación' });
         return;
       }
-      sileo.success({ description: 'Planeación de 16 semanas generada' });
+      sileo.success({ title: 'Planeación de 16 semanas generada correctamente' });
       setSelectedGrupo('');
       // Solo actualizar el grupo afectado en lugar de recargar todo
       loadSingleGrupo(selectedGrupo);
