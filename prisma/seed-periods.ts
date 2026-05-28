@@ -4,6 +4,7 @@
  */
 
 import { PrismaClient, SpecialType } from '@prisma/client';
+import { parseLocalDate } from '../lib/date-utils';
 
 const prisma = new PrismaClient();
 
@@ -29,8 +30,8 @@ async function seedAcademicYear() {
       update: {},
       create: {
         name: '2026-1',
-        startDate: new Date('2026-02-10'),
-        endDate: new Date('2026-06-13'),
+        startDate: parseLocalDate('2026-02-10'),
+        endDate: parseLocalDate('2026-06-13'),
         isActive: true,
         yearId: academicYear.id,
       },

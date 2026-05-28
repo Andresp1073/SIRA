@@ -10,6 +10,14 @@ async function main() {
   console.log('🗑️  Borrando todos los datos (manteniendo solo admins)...\n');
 
   // Orden respetando relaciones: hijos primero
+  await prisma.teacherSubject.deleteMany();
+  console.log('   ✓ TeacherSubject');
+  await prisma.studentEnrollment.deleteMany();
+  console.log('   ✓ StudentEnrollment');
+  await prisma.teacherGroup.deleteMany();
+  console.log('   ✓ TeacherGroup');
+  await prisma.studentGroup.deleteMany();
+  console.log('   ✓ StudentGroup');
   await prisma.attendance.deleteMany();
   console.log('   ✓ Attendance');
   await prisma.logbook.deleteMany();
@@ -26,12 +34,22 @@ async function main() {
   console.log('   ✓ Schedule');
   await prisma.report.deleteMany();
   console.log('   ✓ Report');
+  await prisma.unenrollRequest.deleteMany();
+  console.log('   ✓ UnenrollRequest');
   await prisma.subject.deleteMany();
   console.log('   ✓ Subject');
   await prisma.room.deleteMany();
   console.log('   ✓ Room');
   await prisma.academicPeriod.deleteMany();
   console.log('   ✓ AcademicPeriod');
+  await prisma.specialRange.deleteMany();
+  console.log('   ✓ SpecialRange');
+  await prisma.academicYear.deleteMany();
+  console.log('   ✓ AcademicYear');
+  await prisma.periodWeek.deleteMany();
+  console.log('   ✓ PeriodWeek');
+  await prisma.bitacoraSettings.deleteMany();
+  console.log('   ✓ BitacoraSettings');
 
   // Eliminar todos los usuarios que NO son admin
   const deleted = await prisma.user.deleteMany({

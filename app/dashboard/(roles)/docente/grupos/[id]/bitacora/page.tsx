@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useQueryClient } from '@tanstack/react-query';
 import { format, isAfter, startOfToday } from 'date-fns';
-import { ArrowLeft, BookOpen, CalendarDays, Clock, Save } from 'lucide-react';
+import { BookOpen, CalendarDays, Clock, Save } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { sileo } from 'sileo';
@@ -190,15 +190,6 @@ export default function BitacoraTablaPage() {
       <div className="pb-6 w-full flex flex-col gap-3">
         <div className="flex sm:flex-row flex-col sm:items-center items-start gap-4 justify-between">
           <div className="flex flex-col gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-fit rounded-xl gap-1.5 text-xs -ml-2"
-              onClick={() => router.push(`/dashboard/docente/grupos/${grupoId}`)}
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Detalle del Grupo
-            </Button>
             <div>
               <h1 className="sm:text-2xl text-xl font-semibold tracking-card text-foreground">
                 Planeador Docente

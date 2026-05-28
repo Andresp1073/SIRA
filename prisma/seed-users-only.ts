@@ -14,6 +14,10 @@ async function seedUsersOnly() {
   console.log('🗑️  Limpiando base de datos...');
 
   // Limpiar todo primero
+  await prisma.teacherSubject.deleteMany();
+  await prisma.studentEnrollment.deleteMany();
+  await prisma.teacherGroup.deleteMany();
+  await prisma.studentGroup.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.logbook.deleteMany();
   await prisma.class.deleteMany();
@@ -22,13 +26,15 @@ async function seedUsersOnly() {
   await prisma.group.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.report.deleteMany();
+  await prisma.unenrollRequest.deleteMany();
   await prisma.subject.deleteMany();
   await prisma.room.deleteMany();
-  await prisma.unenrollRequest.deleteMany();
-  await prisma.specialRange.deleteMany();
-  await prisma.academicPeriod.deleteMany();
-  await prisma.academicYear.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.academicPeriod.deleteMany();
+  await prisma.specialRange.deleteMany();
+  await prisma.academicYear.deleteMany();
+  await prisma.periodWeek.deleteMany();
+  await prisma.bitacoraSettings.deleteMany();
 
   console.log('👤 Creando usuarios...\n');
 

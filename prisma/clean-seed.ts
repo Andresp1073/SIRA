@@ -7,7 +7,11 @@ async function main() {
   const password = await hash('admin123', 12);
 
   console.log('🗑️  Wiping database...');
-  // Delete in order to satisfy foreign key constraints if they existed
+  // Delete in order to satisfy foreign key constraints
+  await prisma.teacherSubject.deleteMany();
+  await prisma.studentEnrollment.deleteMany();
+  await prisma.teacherGroup.deleteMany();
+  await prisma.studentGroup.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.logbook.deleteMany();
   await prisma.class.deleteMany();
@@ -16,10 +20,15 @@ async function main() {
   await prisma.group.deleteMany();
   await prisma.schedule.deleteMany();
   await prisma.report.deleteMany();
+  await prisma.unenrollRequest.deleteMany();
   await prisma.subject.deleteMany();
   await prisma.room.deleteMany();
   await prisma.user.deleteMany();
   await prisma.academicPeriod.deleteMany();
+  await prisma.specialRange.deleteMany();
+  await prisma.academicYear.deleteMany();
+  await prisma.periodWeek.deleteMany();
+  await prisma.bitacoraSettings.deleteMany();
 
   console.log('👤 Creating 1 Admin...');
   await prisma.user.create({

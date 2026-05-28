@@ -6,9 +6,7 @@ import { getBitacoraHeader } from '@/lib/bitacora-settings';
 import { db } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import Image from 'next/image';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -171,15 +169,6 @@ export default async function PreviewPage({ params }: PageProps) {
     <div className="space-y-6">
       {/* Nav */}
       <div className="pb-6 w-full flex flex-col gap-3">
-        <div className="flex items-start gap-3">
-          <Link
-            href={`/dashboard/docente/grupos/${id}`}
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-xl px-2 py-1 -ml-2"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Detalle del Grupo
-          </Link>
-        </div>
         <div>
           <h1 className="sm:text-2xl text-xl font-semibold tracking-card text-foreground">
             Vista Previa de Bitácora

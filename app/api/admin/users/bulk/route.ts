@@ -185,7 +185,7 @@ export async function POST(req: Request) {
     const itemsWithPasswords = await Promise.all(
       validItems.map(async item => ({
         ...item,
-        hashedPassword: await bcrypt.hash(item.document, 10),
+        hashedPassword: await bcrypt.hash(item.document, 12),
       }))
     );
 
