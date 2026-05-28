@@ -1,0 +1,114 @@
+'use client';
+
+import type React from 'react';
+
+import { toLocalClass } from '@/lib/class-converters';
+import type { ClassStatus } from '@/lib/class-utils';
+import type { LocalClassWithStatus, TableClassWithStatus } from '@/types/class';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { sileo } from 'sileo';
+
+interface UseClassManagementProps {
+  classes: LocalClassWithStatus[];
+  setClasses: React.Dispatch<React.SetStateAction<LocalClassWithStatus[]>>;
+  fetchClasses: () => Promise<void>;
+  subjectId?: string;
+}
+
+export function useClassManagement({
+  classes,
+  setClasses,
+  fetchClasses,
+  subjectId,
+}: UseClassManagementProps) {
+  const queryClient = useQueryClient();
+  const [classToCancel, setClassToCancel] = useState<LocalClassWithStatus | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCancelClass = (cls: TableClassWithStatus) => {
+    setClassToCancel(toLocalClass(cls));
+    setCancelReason('');
+  };
+
+  const handleUpdateClassStatus = async (classId: string, status: ClassStatus, reason?: string) => {
+    const originalClasses = [...classes];
+    setClasses(prev => prev.map(c => (c.id === classId ? { ...c, status } : c)));
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch(`/api/docente/clases/${classId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'No se pudo actualizar el estado de la clase.');
+      }
+
+      const responseData = await response.json();
+      const updatedClass = responseData.data;
+
+      if (updatedClass) {
+        setClasses(prev =>
+          prev.map(c => {
+            if (c.id === classId) {
+              // Transform schema-based updatedClass to table-friendly format
+              return {
+                ...c,
+                ...updatedClass,
+                subjectName: updatedClass.subject?.name || c.subjectName,
+                subjectCode: updatedClass.subject?.code || c.subjectCode,
+              };
+            }
+            return c;
+          })
+        );
+      }
+      sileo.success({ title: `La clase ha sido marcada como ${status.toLowerCase()}.` });
+
+      // Invalidar queries de React Query si existe subjectId
+      if (subjectId) {
+        queryClient.invalidateQueries({ queryKey: ['subject-classes', subjectId] });
+      }
+
+      await fetchClasses();
+    } catch (error) {
+      setClasses(originalClasses);
+      sileo.error({
+        title: error instanceof Error ? error.message : 'Ocurrió un error inesperado.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleMarkClassAsDone = (classId: string) => {
+    handleUpdateClassStatus(classId, 'SIGNED');
+  };
+
+  const handleConfirmCancel = async () => {
+    if (classToCancel) {
+      await handleUpdateClassStatus(classToCancel.id, 'CANCELLED', cancelReason);
+      setClassToCancel(null);
+      setCancelReason('');
+    }
+  };
+
+  return {
+    // Dialog states
+    classToCancel,
+    setClassToCancel,
+    cancelReason,
+    setCancelReason,
+    isSubmitting,
+
+    // Handlers
+    handleCancelClass,
+    handleMarkClassAsDone,
+    handleConfirmCancel,
+  };
+}

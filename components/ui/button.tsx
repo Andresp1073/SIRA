@@ -1,0 +1,71 @@
+import { Slot } from '@radix-ui/react-slot';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { Loader2 } from 'lucide-react';
+import * as React from 'react';
+
+import { cn } from '@/lib/utils';
+
+const buttonVariants = cva(
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-full text-xs transition-colors duration-200 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-invalid:ring-destructive/20 aria-invalid:border-destructive",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs',
+        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-xs',
+        outline: 'border border-border bg-transparent hover:bg-accent hover:text-accent-foreground',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        ghost: 'hover:bg-accent/50 hover:text-accent-foreground',
+        link: 'text-primary underline-offset-4 hover:underline',
+        warm: 'bg-warm text-warm-foreground hover:bg-warm/90 shadow-xs',
+      },
+      size: {
+        default: 'h-10 px-6 has-[>svg]:px-4',
+        sm: 'h-8 rounded-full gap-1.5 px-4 has-[>svg]:px-3',
+        lg: 'h-11 rounded-full px-8 has-[>svg]:px-5',
+        icon: 'size-10 rounded-full',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+
+function Button({
+  className,
+  variant,
+  size,
+  asChild = false,
+  loading = false,
+  disabled,
+  children,
+  ...props
+}: React.ComponentProps<'button'> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+    loading?: boolean;
+  }) {
+  const Comp = asChild && !loading ? Slot : 'button';
+
+  return (
+    <Comp
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      disabled={disabled || loading}
+      aria-busy={loading}
+      {...props}
+    >
+      {loading ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          {children}
+        </>
+      ) : (
+        children
+      )}
+    </Comp>
+  );
+}
+
+export { Button, buttonVariants };

@@ -1,0 +1,420 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Shift {
+  DAY
+  NIGHT
+}
+
+enum Role {
+  ADMIN
+  DOCENTE
+  ESTUDIANTE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  JUSTIFIED
+}
+
+enum ClassStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  SIGNED
+}
+
+enum ReportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReportFormat {
+  PDF
+  CSV
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum RoomType {
+  LABORATORIO
+  SALA_CLASE
+  AUDITORIO
+}
+
+enum SpecialType {
+  VACATION
+  HOLIDAY
+  RECESS
+}
+
+enum UnenrollStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String?
+  document            String?   @unique
+  emailVerified       DateTime?
+  personalEmail       String?   @unique
+  institutionalEmail  String?   @unique
+  phone               String?
+  studentCode         String?
+  teacherCode         String?
+  signatureUrl        String?
+  password            String?
+  resetToken          String?
+  resetTokenExpiry    DateTime?
+  role                Role      @default(ESTUDIANTE)
+  isActive            Boolean   @default(true)
+  mustChangePassword  Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  teacherSubjects    TeacherSubject[]
+  studentEnrollments StudentEnrollment[]
+  teacherGroups      TeacherGroup[]
+  studentGroups      StudentGroup[]
+  attendances      Attendance[]
+  generatedReports Report[]
+
+  unenrollRequests          UnenrollRequest[] @relation("StudentUnenrollments")
+  unenrollRequestsRequested UnenrollRequest[] @relation("TeacherUnenrollRequests")
+}
+
+model TeacherSubject {
+  teacherId String
+  teacher   User    @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, subjectId])
+}
+
+model StudentEnrollment {
+  studentId String
+  student   User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, subjectId])
+  @@index([studentId])
+}
+
+model TeacherGroup {
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([teacherId, groupId])
+}
+
+model StudentGroup {
+  studentId String
+  student   User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  groupId   String
+  group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([studentId, groupId])
+  @@index([studentId])
+}
+
+model Subject {
+  id               String   @id @default(cuid())
+  name             String
+  code             String
+  group            String?
+  shift            Shift?
+  program          String?
+  semester         Int?
+  credits          Int?
+  directHours      Int?
+  description      String?
+  academicPeriod   String?
+  classroom        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  teachers         TeacherSubject[]
+  students         StudentEnrollment[]
+  groups           Group[]
+  schedules        Schedule[]
+  reports          Report[]
+  classes          Class[]
+  unenrollRequests UnenrollRequest[] @relation("SubjectUnenrollments")
+
+  @@unique([code, group])
+}
+
+model Schedule {
+  id        String    @id @default(cuid())
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+  subjectId String?
+  subject   Subject?  @relation(fields: [subjectId], references: [id])
+  roomId    String?
+  room      Room?     @relation(fields: [roomId], references: [id])
+  groups    Group[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([dayOfWeek])
+  @@index([subjectId])
+  @@index([roomId])
+}
+
+model Group {
+  id             String   @id @default(cuid())
+  code           String
+  subjectId      String
+  subject        Subject  @relation(fields: [subjectId], references: [id])
+  academicPeriod String
+
+  scheduleId  String?
+  schedule    Schedule? @relation(fields: [scheduleId], references: [id])
+
+  roomId String?
+  room   Room?   @relation(fields: [roomId], references: [id])
+
+  shift Shift?
+
+  teachers TeacherGroup[]
+  students StudentGroup[]
+  planning Planning?
+  classes  Class[]        @relation("GroupClasses")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([code, subjectId, academicPeriod])
+  @@index([subjectId])
+}
+
+model Planning {
+  id        String        @id @default(cuid())
+  groupId   String        @unique
+  group     Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  startDate DateTime
+  endDate   DateTime?
+  weeks     AcademicWeek[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model AcademicWeek {
+  id         String    @id @default(cuid())
+  planningId String
+  planning   Planning  @relation(fields: [planningId], references: [id], onDelete: Cascade)
+  number     Int
+  startDate  DateTime
+  endDate    DateTime
+  classes    Class[]   @relation("WeekClasses")
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([planningId])
+}
+
+model Class {
+  id                 String       @id @default(cuid())
+  date               DateTime
+  startTime          DateTime?
+  endTime            DateTime?
+  topic              String?
+  description        String?
+  status             ClassStatus  @default(SCHEDULED)
+  cancellationReason String?
+  subjectId          String
+  subject            Subject      @relation(fields: [subjectId], references: [id])
+  classroom          String?
+  shift              Shift?
+  attendances        Attendance[]
+  qrToken            String?
+  qrTokenExpiresAt   DateTime?
+  notificationSentAt DateTime?
+
+  totalStudents  Int @default(0)
+  presentCount   Int @default(0)
+  absentCount    Int @default(0)
+  lateCount      Int @default(0)
+  justifiedCount Int @default(0)
+
+  groupId  String?
+  group    Group?        @relation("GroupClasses", fields: [groupId], references: [id])
+  weekId   String?
+  week     AcademicWeek? @relation("WeekClasses", fields: [weekId], references: [id])
+  logbook  Logbook?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subjectId, status, date])
+  @@index([subjectId, date])
+  @@index([status, date])
+  @@index([qrToken])
+  @@index([classroom, date])
+  @@index([groupId])
+  @@index([weekId])
+}
+
+model Logbook {
+  id            String   @id @default(cuid())
+  classId       String   @unique
+  class         Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  plannedTopic  String?
+  executedTopic String?
+  activities    String?
+  observations  String?
+  evidence      String   @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Attendance {
+  id            String           @id @default(cuid())
+  status        AttendanceStatus
+  justification String?
+  studentId     String
+  student       User             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId       String
+  class         Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@unique([studentId, classId])
+  @@index([studentId, status])
+  @@index([classId, status])
+}
+
+model Report {
+  id            String       @id @default(cuid())
+  subjectId     String
+  subject       Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   User         @relation(fields: [requestedById], references: [id], onDelete: Cascade)
+  status        ReportStatus @default(PENDING)
+  format        ReportFormat @default(PDF)
+  period        Int          @default(1)
+  year          Int          @default(2025)
+  fileUrl       String?
+  fileName      String?
+  error         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([subjectId])
+  @@index([requestedById])
+}
+
+model Room {
+  id          String    @id @default(cuid())
+  name        String
+  type        RoomType  @default(SALA_CLASE)
+  capacity    Int?
+  description String?
+  isActive    Boolean   @default(true)
+  groups      Group[]
+  schedules   Schedule[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([type])
+}
+
+model AcademicYear {
+  id            String         @id @default(cuid())
+  year          Int            @unique
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  specialRanges SpecialRange[]
+  periods       AcademicPeriod[]
+}
+
+model SpecialRange {
+  id        String       @id @default(cuid())
+  name      String
+  type      SpecialType
+  startDate DateTime
+  endDate   DateTime
+  yearId    String
+  year      AcademicYear @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+}
+
+model AcademicPeriod {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  yearId    String?
+  year      AcademicYear? @relation(fields: [yearId], references: [id])
+  periodWeeks PeriodWeek[]
+}
+
+model PeriodWeek {
+  id        String         @id @default(cuid())
+  periodId  String
+  period    AcademicPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  number    Int
+  name      String?
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([periodId, number])
+}
+
+model BitacoraSettings {
+  id        String   @id @default(cuid())
+  codigo    String   @default("FO-DO-005")
+  version   String   @default("08")
+  fecha     String   @default("mayo de 2026")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UnenrollRequest {
+  id            String         @id @default(cuid())
+  studentId     String
+  student       User           @relation("StudentUnenrollments", fields: [studentId], references: [id])
+  subjectId     String
+  subject       Subject        @relation("SubjectUnenrollments", fields: [subjectId], references: [id])
+  reason        String
+  status        UnenrollStatus @default(PENDING)
+  requestedById String
+  requestedBy   User           @relation("TeacherUnenrollRequests", fields: [requestedById], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([studentId])
+  @@index([subjectId])
+  @@index([requestedById])
+}

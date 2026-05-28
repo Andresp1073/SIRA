@@ -1,0 +1,528 @@
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { CHART_COLORS } from '@/lib/chart-colors';
+import {
+  AlertCircle,
+  BookOpen,
+  CalendarDays,
+  Layout,
+  Percent,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { ChartContainer, ChartTooltipContent } from './ui/chart';
+
+interface CardData {
+  title: string;
+  value: string | number;
+  subtitle: string;
+}
+
+interface ChartData {
+  name: string;
+  value: number;
+  label: string;
+  [key: string]: unknown;
+}
+
+interface DashboardData {
+  cards: CardData[];
+  charts: {
+    roleDistribution: ChartData[];
+    attendanceDistribution: ChartData[];
+    classStatusDistribution: ChartData[];
+    monthlyClasses: { month: string; clases: number }[];
+    topSubjects: Array<{
+      name: string;
+      code: string;
+      students: number;
+    }>;
+    classroomOccupancy: Array<{
+      name: string;
+      value: number;
+    }>;
+  };
+  metrics: {
+    completedClasses: number;
+    totalReports: number;
+    activeTeachers: number;
+    [key: string]: unknown;
+  };
+}
+
+const CARD_ICONS = [Users, BookOpen, Percent, CalendarDays];
+
+const AdminDashboardComponent = () => {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/dashboard', { credentials: 'include' });
+        if (!res.ok) throw new Error(`Error ${res.status}`);
+        setData(await res.json());
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Error al cargar datos');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="space-y-6 pb-12">
+        <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-8 w-44" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-xl" />
+          ))}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="rounded-2xl border-border/50">
+              <CardContent className="pt-6 pb-5 px-5">
+                <Skeleton className="h-4 w-24 mb-3" />
+                <Skeleton className="h-8 w-16 mb-1" />
+                <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64 rounded-2xl" />
+          <Skeleton className="h-64 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-sm w-full border-destructive/30">
+          <CardContent className="pt-8 pb-6 flex flex-col items-center text-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center">
+              <AlertCircle className="h-6 w-6 text-destructive" />
+            </div>
+            <div>
+              <p className="sm:text-sm text-xs font-semibold">Error al cargar datos</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {error || 'No se pudieron obtener los datos'}
+              </p>
+            </div>
+            <Button size="default" variant="outline" onClick={() => window.location.reload()}>
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const PIE_COLORS = CHART_COLORS.primary;
+  const BAR_COLORS = CHART_COLORS.primary;
+  const axisStyle = {
+    fontSize: '0.7rem',
+    fill: 'var(--muted-foreground)',
+    fontFamily: 'var(--font-sans)',
+  } as const;
+  const gridStyle = { stroke: 'var(--border)', strokeOpacity: 0.4 } as const;
+
+  const maxStudents = Math.max(...data.charts.topSubjects.map(s => s.students), 1);
+
+  return (
+    <div className="space-y-5 pb-10">
+      {/* Header */}
+      <div
+        id="tour-dashboard-title"
+        className="flex flex-col sm:flex-row justify-between items-start gap-4"
+      >
+        <div>
+          <h1 className="text-2xl font-semibold tracking-card text-foreground">Inicio</h1>
+          <p className="text-muted-foreground sm:text-sm text-xs mt-1">
+            Estado general del sistema académico.
+          </p>
+        </div>
+        <Badge variant="outline" className="text-xs font-normal px-3 py-1.5 capitalize shrink-0">
+          {new Date().toLocaleDateString('es-CO', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })}
+        </Badge>
+      </div>
+
+      {/* Quick Links - Diseño Mejorado */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          {
+            href: '/dashboard/admin/planeador',
+            icon: CalendarDays,
+            label: 'Planeador',
+            desc: 'Configurar semestre',
+            color: 'bg-primary/15 text-primary',
+          },
+          {
+            href: '/dashboard/admin/salas',
+            icon: Layout,
+            label: 'Salas',
+            desc: 'Gestionar espacios',
+            color: 'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+          },
+          {
+            href: '/dashboard/admin/reportes',
+            icon: TrendingUp,
+            label: 'Reportes',
+            desc: 'Ver avance docentes',
+            color: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+          },
+        ].map(({ href, icon: Icon, label, desc, color }) => (
+          <Link key={href} href={href}>
+            <Card className="h-full transition-all duration-200 hover:shadow-sm hover:border-primary/20 cursor-pointer">
+              <CardContent className="py-4 px-4 flex items-center gap-3">
+                <div
+                  className={`flex w-10 h-10 items-center justify-center rounded-xl ${color} shrink-0`}
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="sm:text-sm text-xs font-semibold leading-none text-foreground">
+                    {label}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1 truncate">{desc}</p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      {/* Stat Cards - Diseño Mejorado */}
+      <div id="tour-dashboard-metrics" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {data.cards.map((card, i) => {
+          const Icon = CARD_ICONS[i];
+          const colors = [
+            'bg-primary/15 text-primary',
+            'bg-violet-500/15 text-violet-600 dark:text-violet-400',
+            'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+            'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+          ];
+          const colorClass = colors[i % colors.length];
+
+          return (
+            <Card
+              key={i}
+              className="hover:shadow-sm transition-shadow duration-200"
+            >
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    {card.title}
+                  </p>
+                  <div
+                    className={`h-8 w-8 rounded-xl ${colorClass} flex items-center justify-center`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{card.value}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{card.subtitle}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Charts Row 1 - Diseño Mejorado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Role Distribution */}
+        <Card
+          id="tour-dashboard-users-chart"
+          className="border-border bg-card"
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="sm:text-sm text-xs font-semibold tracking-wide text-foreground">
+              Distribución de Usuarios
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.charts.roleDistribution.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3">
+                <Users className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+                <p className="text-xs text-muted-foreground font-medium">Sin usuarios registrados</p>
+              </div>
+            ) : (
+              <ChartContainer config={{}} className="mx-auto aspect-square max-h-[260px] w-full">
+                <PieChart>
+                  <Pie
+                    data={data.charts.roleDistribution}
+                    dataKey="value"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={95}
+                    paddingAngle={3}
+                    strokeWidth={0}
+                    label={({ percent }) =>
+                      (percent ?? 0) > 0.05 ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''
+                    }
+                    labelLine={false}
+                  >
+                    {data.charts.roleDistribution.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Legend
+                    layout="horizontal"
+                    verticalAlign="bottom"
+                    wrapperStyle={{ paddingTop: '16px' }}
+                    formatter={value => (
+                      <span className="text-xs text-muted-foreground">{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Monthly Classes */}
+        <Card
+          id="tour-dashboard-classes-chart"
+          className="border-border bg-card"
+        >
+          <CardHeader className="pb-2">
+            <CardTitle className="sm:text-sm text-xs font-semibold tracking-wide text-foreground">
+              Clases por Mes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.charts.monthlyClasses.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3">
+                <CalendarDays className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground font-medium">Sin clases registradas</p>
+                  <p className="text-[11px] text-muted-foreground/60 mt-1">Los datos aparecerán cuando se programen clases</p>
+                </div>
+              </div>
+            ) : (
+            <ChartContainer config={{}} className="mx-auto aspect-square max-h-[260px] w-full">
+              <AreaChart
+                data={data.charts.monthlyClasses}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient id="colorClases" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={CHART_COLORS.primary[0]} stopOpacity={0.25} />
+                    <stop offset="95%" stopColor={CHART_COLORS.primary[0]} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" style={gridStyle} vertical={false} />
+                <XAxis dataKey="month" tick={axisStyle} tickLine={false} axisLine={false} />
+                <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
+                <Tooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="clases"
+                  stroke={CHART_COLORS.primary[0]}
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#colorClases)"
+                />
+              </AreaChart>
+            </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 2 - Diseño Mejorado */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Attendance Distribution */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="sm:text-sm text-xs font-semibold tracking-wide text-foreground">
+              Estado de Asistencias
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.charts.attendanceDistribution.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3">
+                <AlertCircle className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground font-medium">
+                    Sin registros de asistencia
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/60 mt-1">
+                    Los registros aparecerán cuando los docentes tomen asistencia
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ChartContainer config={{}} className="mx-auto aspect-square max-h-[260px] w-full">
+                <BarChart
+                  data={data.charts.attendanceDistribution}
+                  margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                  barSize={36}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} style={gridStyle} />
+                  <XAxis dataKey="label" tick={axisStyle} tickLine={false} axisLine={false} />
+                  <YAxis tick={axisStyle} tickLine={false} axisLine={false} />
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="asistencia" radius={[6, 6, 0, 0]}>
+                    {data.charts.attendanceDistribution.map((_, i) => (
+                      <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Classroom Occupancy */}
+        <Card className="border-border bg-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="sm:text-sm text-xs font-semibold tracking-wide text-foreground">
+              Uso de Salones
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">Por cantidad de clases realizadas</p>
+          </CardHeader>
+          <CardContent>
+            {data.charts.classroomOccupancy.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 gap-3">
+                <Layout className="h-8 w-8 text-muted-foreground/40" aria-hidden="true" />
+                <div className="text-center">
+                  <p className="text-xs text-muted-foreground font-medium">
+                    No hay salones registrados
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/60 mt-1">
+                    Agrega salones para ver su uso
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ChartContainer config={{}} className="mx-auto max-h-[260px] w-full">
+                <BarChart
+                  data={data.charts.classroomOccupancy}
+                  layout="vertical"
+                  margin={{ top: 5, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} style={gridStyle} />
+                  <XAxis type="number" tick={axisStyle} tickLine={false} axisLine={false} />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    tick={axisStyle}
+                    tickLine={false}
+                    axisLine={false}
+                    width={70}
+                  />
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                    {data.charts.classroomOccupancy.map((_, i) => (
+                      <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Subjects - Diseño Mejorado */}
+      <Card className="border-border bg-card">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <CardTitle className="sm:text-sm text-xs font-semibold tracking-wide text-foreground">
+              Materias con Más Estudiantes
+            </CardTitle>
+          </div>
+          <p className="text-xs text-muted-foreground">Estudiantes matriculados por grupo</p>
+        </CardHeader>
+        <CardContent>
+          {data.charts.topSubjects.length === 0 || maxStudents === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <BookOpen className="h-8 w-8 text-muted-foreground/30" aria-hidden="true" />
+              <div className="text-center">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Sin matrículas registradas
+                </p>
+                <p className="text-[11px] text-muted-foreground/60 mt-1">
+                  Las matrículas de estudiantes aparecerán aquí
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {data.charts.topSubjects.map((subject, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className="w-5 text-center">
+                    <span className="text-xs font-semibold text-muted-foreground">{i + 1}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold truncate">{subject.name}</p>
+                        <p className="text-[10px] text-muted-foreground font-mono uppercase">
+                          {subject.code}
+                        </p>
+                      </div>
+                      <span className="sm:text-sm text-xs font-semibold tabular-nums ml-3 shrink-0">
+                        {subject.students}
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${(subject.students / maxStudents) * 100}%`,
+                          backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default AdminDashboardComponent;

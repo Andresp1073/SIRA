@@ -1,0 +1,108 @@
+import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/prisma';
+import { getServerSession } from 'next-auth/next';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+
+    const includePlaneacion = req.nextUrl.searchParams.get('includePlaneacion') === 'true';
+
+    const groups = await db.group.findMany({
+      include: {
+        subject: { select: { id: true, name: true, code: true } },
+        teachers: { include: { teacher: { select: { id: true, name: true } } } },
+        schedule: {
+          select: {
+            id: true,
+            dayOfWeek: true,
+            startTime: true,
+            endTime: true,
+            room: { select: { id: true, name: true } },
+          },
+        },
+        room: { select: { id: true, name: true } },
+        students: { select: { studentId: true } },
+        ...(includePlaneacion
+          ? {
+              planning: {
+                include: {
+                  weeks: {
+                    select: {
+                      id: true,
+                      number: true,
+                      startDate: true,
+                      endDate: true,
+                      classes: { select: { id: true, status: true } },
+                    },
+                  },
+                },
+              },
+            }
+          : {
+              planning: {
+                select: {
+                  id: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+            }),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const groupsWithDocentes = groups.map(g => {
+      const { teachers, schedule, room, code, academicPeriod, shift, planning, students, ...rest } = g;
+      return {
+        ...rest,
+        codigo: code,
+        periodoAcademico: academicPeriod,
+        docentes: teachers.map(t => t.teacher),
+        estudianteIds: students.map(s => s.studentId),
+        shift,
+        planning,
+        horario: schedule
+          ? {
+              ...schedule,
+              diaSemana: schedule.dayOfWeek,
+              horaInicio: schedule.startTime,
+              horaFin: schedule.endTime,
+              room: schedule.room,
+            }
+          : null,
+        sala: room,
+      };
+    });
+
+    return NextResponse.json({ grupos: groupsWithDocentes });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session || session.user?.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    const body = await req.json();
+    const group = await db.group.create({
+      data: {
+        code: body.codigo,
+        subjectId: body.subjectId,
+        academicPeriod: body.periodoAcademico,
+        ...(body.docenteIds?.length ? { teachers: { create: body.docenteIds.map((id: string) => ({ teacherId: id })) } } : {}),
+        scheduleId: body.horarioId ?? null,
+        roomId: body.salaId ?? null,
+      },
+    });
+    return NextResponse.json(group);
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}
