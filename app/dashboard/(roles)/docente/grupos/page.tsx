@@ -21,6 +21,7 @@ interface GrupoDocente {
   estudianteIds?: string[];
   studentIds?: string[];
   planeacion?: { id: string; semanas: { numero: number }[] } | null;
+  _count?: { students: number };
 }
 
 const DIA_LABELS: Record<string, string> = {
@@ -85,7 +86,7 @@ export default function MisGruposPage() {
             const horaInicio = g.horario?.horaInicio || g.schedule?.startTime || '';
             const horaFin = g.horario?.horaFin || g.schedule?.endTime || '';
             const sala = g.sala?.name || g.room?.name || '';
-            const studentsCount = (g.estudianteIds || g.studentIds)?.length || 0;
+            const studentsCount = g._count?.students ?? (g.estudianteIds || g.studentIds)?.length ?? 0;
             return (
               <Card
                 key={g.id}

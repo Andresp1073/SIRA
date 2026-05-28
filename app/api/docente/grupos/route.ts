@@ -16,6 +16,7 @@ export async function GET() {
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },
         room: { select: { name: true, type: true } },
         planning: { select: { id: true, weeks: { select: { number: true } } } },
+        _count: { select: { students: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
