@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
     const user = await db.user.findUnique({
       where: { id: session.user.id },
-      select: { mustChangePassword: true, personalEmail: true, institutionalEmail: true },
+      select: { mustChangePassword: true },
     });
 
     if (!user?.mustChangePassword) {
@@ -32,11 +32,6 @@ export async function POST(req: Request) {
       where: { id: session.user.id },
       data: { password: hashedPassword, mustChangePassword: false },
     });
-
-    // Invalidate cache
-    const emails = [user.personalEmail, user.institutionalEmail].filter(Boolean) as string[];
-    const { clearAllUserCache } = await import('@/lib/cache');
-    await clearAllUserCache(session.user.id, emails);
 
     return NextResponse.json({ message: 'Contraseña establecida exitosamente' });
   } catch (error) {

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
     let subject = await db.subject.findFirst({
       where: {
         id: subjectId,
-        teacherIds: { has: session.user.id },
+        teachers: { some: { teacherId: session.user.id  } },
       },
       include: {
         classes: {
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
       const group = await db.group.findFirst({
         where: {
           id: subjectId,
-          teacherIds: { has: session.user.id },
+          teachers: { some: { teacherId: session.user.id  } },
         },
         include: {
           subject: {

@@ -10,7 +10,7 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
     const groups = await db.group.findMany({
-      where: { teacherIds: { has: session.user.id } },
+      where: { teachers: { some: { teacherId: session.user.id  } } },
       include: {
         subject: { select: { id: true, name: true, code: true, credits: true } },
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },

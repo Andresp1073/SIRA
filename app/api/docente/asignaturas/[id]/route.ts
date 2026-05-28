@@ -18,8 +18,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       where: {
         id,
         OR: [
-          { teacherIds: { has: session.user.id } },
-          { groups: { some: { teacherIds: { has: session.user.id } } } },
+          { teachers: { some: { teacherId: session.user.id  } } },
+          { groups: { some: { teachers: { some: { teacherId: session.user.id  } } } } },
         ],
       },
     });
@@ -29,7 +29,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const grupo = await db.group.findFirst({
         where: {
           id,
-          teacherIds: { has: session.user.id },
+          teachers: { some: { teacherId: session.user.id  } },
         },
         include: { subject: true },
       });
@@ -43,10 +43,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ message: 'Asignatura o Grupo no encontrado' }, { status: 404 });
     }
 
-    // Map Prisma shape (teacherIds) to schema shape (teacherId) for validation
+    const subjectWithTeachers = await db.subject.findUnique({
+      where: { id: subject.id },
+      include: { teachers: { select: { teacherId: true } } },
+    });
+    // Map Prisma shape (teachers) to schema shape (teacherId) for validation
     const validado = DocenteSubjectSchema.safeParse({
       ...subject,
-      teacherId: subject.teacherIds?.[0] ?? '',
+      teacherId: subjectWithTeachers?.teachers?.[0]?.teacherId ?? '',
     });
     if (!validado.success) {
       return NextResponse.json(

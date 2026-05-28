@@ -12,7 +12,7 @@ export async function GET() {
     const docenteId = session.user.id;
 
     const groups = await db.group.findMany({
-      where: { teacherIds: { has: docenteId } },
+      where: { teachers: { some: { teacherId: docenteId  } } },
       include: {
         subject: { select: { id: true, name: true, code: true, credits: true } },
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },

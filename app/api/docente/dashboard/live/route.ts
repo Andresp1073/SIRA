@@ -20,7 +20,7 @@ export async function GET() {
     const liveClass = await db.class.findFirst({
       where: {
         subject: {
-          teacherIds: { has: teacherId },
+          teachers: { some: { teacherId: teacherId  } },
         },
         status: 'SCHEDULED',
         startTime: {
@@ -53,15 +53,15 @@ export async function GET() {
     } else {
       // For teacher, count students in their subjects
       const subjectsWithStudents = await db.subject.findMany({
-        where: { teacherIds: { has: teacherId } },
-        select: { studentIds: true },
+        where: { teachers: { some: { teacherId: teacherId  } } },
+        select: { students: { select: { studentId: true } } },
       });
 
       // Count unique students across all teacher's subjects
       const uniqueStudentIds = new Set<string>();
 
       subjectsWithStudents.forEach(subject => {
-        subject.studentIds.forEach(id => uniqueStudentIds.add(id));
+        subject.students.forEach(s => uniqueStudentIds.add(s.studentId));
       });
 
       totalStudents = uniqueStudentIds.size;

@@ -20,7 +20,7 @@ export async function GET(
           select: {
             id: true,
             code: true,
-            teacherIds: true,
+            teachers: { select: { teacherId: true } },
             subject: { select: { name: true, code: true } },
           },
         },
@@ -36,7 +36,7 @@ export async function GET(
     if (clase.group?.id !== grupoId) {
       return NextResponse.json({ error: 'Clase no pertenece al grupo' }, { status: 403 });
     }
-    if (!clase.group?.teacherIds.includes(session.user.id)) {
+    if (!clase.group?.teachers.some(t => t.teacherId === session.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -44,13 +44,11 @@ export async function GET(
     const group = await db.group.findUnique({
       where: { id: grupoId },
       select: {
-        studentIds: true,
-        students: { select: { id: true, name: true } },
+        students: { include: { student: { select: { id: true, name: true } } } },
       },
     });
 
-    const existingAttendanceIds = clase.attendances.map(a => a.studentId);
-    const allStudents = group?.students ?? [];
+    const allStudents = group?.students.map(s => s.student) ?? [];
 
     const asistencias = allStudents.map(student => {
       const existing = clase.attendances.find(a => a.studentId === student.id);
@@ -96,7 +94,7 @@ export async function POST(
     const currentClass = await db.class.findUnique({
       where: { id: claseId },
       include: {
-        group: { select: { id: true, teacherIds: true, studentIds: true } },
+        group: { select: { id: true, teachers: { select: { teacherId: true } }, students: { select: { studentId: true } } } },
       },
     });
     if (!currentClass) return NextResponse.json({ error: 'Clase no encontrada' }, { status: 404 });
@@ -104,12 +102,12 @@ export async function POST(
     if (currentClass.group?.id !== grupoId) {
       return NextResponse.json({ error: 'Clase no pertenece al grupo' }, { status: 403 });
     }
-    if (!currentClass.group?.teacherIds.includes(session.user.id)) {
+    if (!currentClass.group?.teachers.some(t => t.teacherId === session.user.id)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (asistencias && Array.isArray(asistencias)) {
-      const groupStudentIds = new Set(currentClass.group.studentIds);
+      const groupStudentIds = new Set(currentClass.group.students.map(s => s.studentId));
       for (const a of asistencias) {
         if (!groupStudentIds.has(a.studentId)) {
           return NextResponse.json(
@@ -170,6 +168,7 @@ export async function POST(
           executedTopic: executedTopic ?? '',
           activities: activities ?? '',
           observations: observations ?? '',
+          evidence: '',
         },
       });
     }

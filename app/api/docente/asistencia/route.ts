@@ -1,5 +1,4 @@
 import { authOptions } from '@/lib/auth';
-import { clearSubjectCache } from '@/lib/cache';
 import { db } from '@/lib/prisma';
 import { Role } from '@prisma/client';
 import { getServerSession } from 'next-auth';
@@ -25,13 +24,13 @@ export async function GET(request: Request) {
       where: {
         id: classId,
         group: {
-          teacherIds: { has: session.user.id },
+          teachers: { some: { teacherId: session.user.id  } },
         },
       },
       include: {
         group: {
           include: {
-            subject: { select: { id: true, name: true, studentIds: true } },
+            subject: { select: { id: true, name: true, students: { select: { studentId: true } } } },
           },
         },
       },
@@ -45,7 +44,7 @@ export async function GET(request: Request) {
     }
 
     // 2. Obtener los IDs de los estudiantes inscritos en el grupo
-    const studentIds = classWithSubject.group?.subject?.studentIds || [];
+    const studentIds = classWithSubject.group?.subject?.students?.map(s => s.studentId) || [];
 
     if (studentIds.length === 0) {
       return NextResponse.json([]);
@@ -98,7 +97,7 @@ export async function POST(request: Request) {
       where: {
         id: classId,
         group: {
-          teacherIds: { has: session.user.id },
+          teachers: { some: { teacherId: session.user.id  } },
         },
       },
     });
@@ -120,9 +119,6 @@ export async function POST(request: Request) {
     );
 
     await db.$transaction(updatePromises);
-
-    // CACHE: Invalidate cache for this subject (affects all students and teacher)
-    await clearSubjectCache(classWithSubject.subjectId);
 
     return NextResponse.json({ message: 'Asistencia guardada con éxito' }, { status: 200 });
   } catch (error) {
@@ -153,7 +149,7 @@ export async function PUT(request: Request) {
       where: {
         id: classId,
         group: {
-          teacherIds: { has: session.user.id },
+          teachers: { some: { teacherId: session.user.id  } },
         },
       },
     });
@@ -171,9 +167,6 @@ export async function PUT(request: Request) {
       update: { status },
       create: { studentId, classId, status },
     });
-
-    // CACHE: Invalidate cache for this subject (affects all students and teacher)
-    await clearSubjectCache(classWithSubject.subjectId);
 
     return NextResponse.json(updatedAttendance, { status: 200 });
   } catch (error) {

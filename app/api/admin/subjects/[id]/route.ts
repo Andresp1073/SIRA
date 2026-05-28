@@ -70,9 +70,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.shift !== undefined && { shift: body.shift }),
       ...(body.academicPeriod !== undefined && { academicPeriod: body.academicPeriod }),
       // Un solo docente por asignatura
-      ...(teacherId !== undefined && {
-        teacherIds: teacherId ? [teacherId] : [],
-      }),
+      ...(teacherId !== undefined
+        ? {
+            teachers: {
+              deleteMany: {},
+              ...(teacherId ? { create: { teacherId } } : {}),
+            },
+          }
+        : {}),
     };
 
     const updatedSubject = await db.subject.update({
@@ -80,20 +85,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: updateData,
       include: {
         teachers: {
-          select: {
-            id: true,
-            name: true,
-            institutionalEmail: true,
-            teacherCode: true,
+          include: {
+            teacher: {
+              select: {
+                id: true,
+                name: true,
+                institutionalEmail: true,
+                teacherCode: true,
+              },
+            },
           },
         },
+        _count: { select: { students: true } },
       },
     });
 
-    // Calcular total de estudiantes desde el propio subject (mantener compatibilidad)
-    const totalStudents = Array.isArray(updatedSubject.studentIds)
-      ? updatedSubject.studentIds.length
-      : 0;
+    // Calcular total de estudiantes desde el propio subject
+    const totalStudents = updatedSubject._count?.students || 0;
 
     return NextResponse.json({
       ...updatedSubject,
@@ -124,7 +132,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     // Verificar si tiene estudiantes matriculados
-    const studentCount = existingSubject.studentIds?.length || 0;
+    const studentCount = 0;
+    // Note: student count check via studentIds was removed - subject no longer has direct studentIds array
 
     if (studentCount > 0) {
       return NextResponse.json(

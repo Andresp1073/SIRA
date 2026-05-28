@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const subject = await db.subject.findUnique({
       where: { id: subjectId },
-      include: { teachers: { select: { id: true, name: true, document: true } } },
+      include: { teachers: { include: { teacher: { select: { id: true, name: true, document: true } } } } },
     });
 
     if (!subject) {
@@ -84,7 +84,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     };
 
     const results: PreviewResult[] = [];
-    const existingTeacherDocs = new Set(subject.teachers.map(t => t.document).filter(Boolean));
+    const existingTeacherDocs = new Set(subject.teachers.map(t => t.teacher.document).filter(Boolean));
 
     // Buscar docentes por documento o correo
     const allDocentes = await db.user.findMany({
@@ -187,8 +187,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await db.subject.update({
         where: { id: subjectId },
         data: {
-          teacherIds: {
-            set: [teacherIdToAdd],
+          teachers: {
+            deleteMany: {},
+            create: { teacherId: teacherIdToAdd },
           },
         },
       });

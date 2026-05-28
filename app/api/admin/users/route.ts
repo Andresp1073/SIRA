@@ -51,10 +51,10 @@ export async function GET(req: NextRequest) {
 
     if (search) {
       whereClause.OR = [
-        { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { personalEmail: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { institutionalEmail: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { document: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { name: { contains: search } },
+        { personalEmail: { contains: search } },
+        { institutionalEmail: { contains: search } },
+        { document: { contains: search } },
       ];
     }
 

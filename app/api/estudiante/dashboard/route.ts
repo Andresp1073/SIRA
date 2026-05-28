@@ -1,6 +1,5 @@
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/prisma';
-import { redis } from '@/lib/redis';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 
@@ -35,42 +34,31 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // CACHE: Try to get from cache first (5 minutes TTL)
-    const cacheKey = `dashboard:estudiante:${session.user.id}`;
-    let cached = null;
-    try {
-      cached = await redis.get(cacheKey);
-      if (cached) {
-        return NextResponse.json(cached);
-      }
-    } catch {
-      // Cache not available, continue without cache
-    }
-
     const now = new Date();
 
-    // Variables for general cards statistics
     let globalTotalClasses = 0;
     let globalAttendedClasses = 0;
     let subjectsAtRisk = 0;
 
-    // Calculate date range for weekly average (last 4 weeks)
     const fourWeeksAgo = new Date(now);
     fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
 
     let weeklyTotalClasses = 0;
     let weeklyAttendedClasses = 0;
 
-    // Get ONLY the groups where student is directly enrolled (via Group.studentIds)
     const groupsWithStudent = await db.group.findMany({
-      where: { studentIds: { has: session.user.id } },
+      where: { students: { some: { studentId: session.user.id  } } },
       include: {
         subject: {
           include: {
             teachers: {
-              select: {
-                id: true,
-                name: true,
+              include: {
+                teacher: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },
@@ -78,7 +66,6 @@ export async function GET() {
       },
     });
 
-    // Extract unique subjects from groups
     const subjectsMap = new Map();
     groupsWithStudent.forEach(g => {
       if (!subjectsMap.has(g.subject.id)) {
@@ -88,7 +75,6 @@ export async function GET() {
     const subjects = Array.from(subjectsMap.values());
     const subjectIds = subjects.map(s => s.id);
 
-    // OPTIMIZATION: Get all classes for all subjects in a single query
     const allClasses = await db.class.findMany({
       where: {
         subjectId: {
@@ -108,7 +94,6 @@ export async function GET() {
       },
     });
 
-    // OPTIMIZATION: Get all attendances for this student in all subjects in a single query
     const allAttendances = await db.attendance.findMany({
       where: {
         studentId: session.user.id,
@@ -133,7 +118,6 @@ export async function GET() {
       },
     });
 
-    // OPTIMIZATION: Get weekly classes in a single query
     const weeklyClasses = await db.class.findMany({
       where: {
         subjectId: {
@@ -151,7 +135,6 @@ export async function GET() {
       },
     });
 
-    // OPTIMIZATION: Get weekly attendances in a single query
     const weeklyAttendances = await db.attendance.findMany({
       where: {
         studentId: session.user.id,
@@ -171,8 +154,6 @@ export async function GET() {
       },
     });
 
-    // OPTIMIZATION: Get next classes for all subjects in a single query
-    // Only show SCHEDULED classes (created by teacher), same as docente dashboard
     const nextClasses = await db.class.findMany({
       where: {
         subjectId: {
@@ -192,7 +173,6 @@ export async function GET() {
       orderBy: { date: 'asc' },
     });
 
-    // Group data by subjectId for efficient lookup
     const classesBySubject = new Map<string, typeof allClasses>();
     allClasses.forEach(cls => {
       if (!classesBySubject.has(cls.subjectId)) {
@@ -229,7 +209,6 @@ export async function GET() {
       }
     });
 
-    // Process subjects using the pre-fetched data
     const processedSubjects: SubjectResponse[] = [];
     for (const subject of subjects) {
       const subjectClasses = classesBySubject.get(subject.id) || [];
@@ -237,33 +216,26 @@ export async function GET() {
       const nextClass = nextClassesBySubject.get(subject.id);
       const subjectWeeklyClasses = weeklyClassesBySubject.get(subject.id) || 0;
 
-      // Count total classes for this subject
       const totalClasses = subjectClasses.length;
 
-      // Count attended classes (PRESENTE + TARDANZA) from attendance records
       const attendedClasses = subjectAttendances.filter(
         att => (att.status as string) === 'PRESENT' || (att.status as string) === 'LATE'
       ).length;
 
-      // Calcular porcentaje de asistencia
       let attendancePercentage = 0;
       if (totalClasses > 0) {
         attendancePercentage = Math.round((attendedClasses / totalClasses) * 100);
       }
 
-      // Add to global counters
       globalTotalClasses += totalClasses;
       globalAttendedClasses += attendedClasses;
 
-      // Check if subject is at risk (less than 70% attendance)
       if (attendancePercentage < 70 && totalClasses > 0) {
         subjectsAtRisk++;
       }
 
-      // Add weekly counts
       weeklyTotalClasses += subjectWeeklyClasses;
 
-      // Calculate time until next class
       let timeUntilNextClass = '';
       if (nextClass) {
         const timeDiff = new Date(nextClass.date).getTime() - now.getTime();
@@ -280,12 +252,11 @@ export async function GET() {
         }
       }
 
-      // Add the processed subject to the results
       processedSubjects.push({
         id: subject.id,
         name: subject.name,
         code: subject.code,
-        teacher: subject.teachers[0]?.name || 'Docente no asignado',
+        teacher: subject.teachers[0]?.teacher?.name || 'Docente no asignado',
         nextClass: nextClass
           ? {
               name: `Clase de ${subject.name}`,
@@ -300,19 +271,15 @@ export async function GET() {
       });
     }
 
-    // Calculate weekly attendance (global)
     weeklyAttendedClasses = weeklyAttendedCount;
     weeklyTotalClasses = weeklyClasses.length;
 
-    // Calculate global attendance percentage
     const globalAttendancePercentage =
       globalTotalClasses > 0 ? Math.round((globalAttendedClasses / globalTotalClasses) * 100) : 0;
 
-    // Calculate weekly attendance average
     const weeklyAttendanceAverage =
       weeklyTotalClasses > 0 ? Math.round((weeklyAttendedClasses / weeklyTotalClasses) * 100) : 0;
 
-    // Create cards object with general statistics
     const cards: CardsResponse = {
       totalClasses: globalTotalClasses,
       attendedClasses: globalAttendedClasses,
@@ -328,7 +295,7 @@ export async function GET() {
         id: cls.id,
         title: `Clase de ${subjects.find(s => s.id === cls.subjectId)?.name || 'Asignatura'}`,
         code: subjects.find(s => s.id === cls.subjectId)?.code || '',
-        teacher: subjects.find(s => s.id === cls.subjectId)?.teachers[0]?.name || 'Docente',
+        teacher: subjects.find(s => s.id === cls.subjectId)?.teachers[0]?.teacher?.name || 'Docente',
         date: cls.date.toISOString(),
         startTime: cls.startTime
           ? cls.startTime.toISOString().split('T')[1].substring(0, 5)
@@ -339,13 +306,6 @@ export async function GET() {
         isEvent: false,
       })),
     };
-
-    // CACHE: Store in cache for 5 minutes (300 seconds)
-    try {
-      await redis.set(cacheKey, response, { ex: 300 });
-    } catch {
-      // Cache not available, continue without caching
-    }
 
     return NextResponse.json(response);
   } catch (error: unknown) {

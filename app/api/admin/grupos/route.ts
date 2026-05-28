@@ -21,7 +21,7 @@ export async function GET() {
         shift: true,
         academicPeriod: true,
         program: true,
-        teachers: { select: { id: true, name: true } },
+        teachers: { include: { teacher: { select: { id: true, name: true } } } },
         _count: { select: { classes: true } },
       },
       orderBy: [{ academicPeriod: 'desc' }, { code: 'asc' }],

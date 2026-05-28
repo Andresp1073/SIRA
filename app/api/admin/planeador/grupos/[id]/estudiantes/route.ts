@@ -12,34 +12,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     const { estudianteIds } = await req.json();
 
-    // Update group's student IDs
-    await db.group.update({
-      where: { id },
-      data: { studentIds: estudianteIds },
-    });
-
-    // Remove this group from all students who are no longer in it
-    await db.user.updateMany({
-      where: { 
-        studentGroupsIds: { has: id },
-        id: { notIn: estudianteIds }
-      },
-      data: { studentGroupsIds: { pull: id } } as any,
-    });
-
-    // Set correctly for each student
-    for (const estudianteId of estudianteIds) {
-      const user = await db.user.findUnique({
-        where: { id: estudianteId },
-        select: { studentGroupsIds: true },
-      });
-      if (user && !user.studentGroupsIds.includes(id)) {
-        await db.user.update({
-          where: { id: estudianteId },
-          data: { studentGroupsIds: { push: id } },
+    // Replace all student assignments for this group
+    await db.$transaction(async tx => {
+      await tx.studentGroup.deleteMany({ where: { groupId: id } });
+      if (estudianteIds.length > 0) {
+        await tx.studentGroup.createMany({
+          data: estudianteIds.map((studentId: string) => ({ studentId, groupId: id })),
         });
       }
-    }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

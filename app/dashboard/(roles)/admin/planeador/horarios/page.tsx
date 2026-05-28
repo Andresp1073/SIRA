@@ -214,6 +214,11 @@ export default function ProgramacionPage() {
 
   useEffect(loadGrupos, []);
 
+  // Clear preview state when a new file is selected
+  useEffect(() => {
+    setPreviewData([]);
+  }, [file]);
+
   const handleCancel = () => {
     setFile(null);
     setPreviewData([]);

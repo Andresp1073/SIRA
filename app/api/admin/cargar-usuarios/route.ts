@@ -1,7 +1,5 @@
-import WelcomeUserEmail from '@/app/emails/WelcomeUserEmail';
 import { authOptions } from '@/lib/auth';
 import { decodeCSVBuffer } from '@/lib/csv-encoding';
-import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/prisma';
 import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -43,29 +41,6 @@ const generatePassword = (length: number = 10) => {
     password += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return password;
-};
-
-// Función para enviar correo de manera asíncrona (no bloqueante)
-const sendWelcomeEmailAsync = async (
-  email: string,
-  name: string,
-  password: string
-): Promise<void> => {
-  try {
-    await sendEmail({
-      to: email,
-      subject: '¡Bienvenido/a a la Plataforma!',
-      react: WelcomeUserEmail({
-        name: name,
-        email: email,
-        password: password,
-        loginUrl: `${process.env.NEXTAUTH_URL}/auth/signin`,
-        supportEmail: 'soporte@example.com',
-      }),
-    });
-  } catch (emailError) {
-    // Error sending email
-  }
 };
 
 export async function POST(request: Request) {
@@ -518,7 +493,6 @@ export async function POST(request: Request) {
 
     const finalResults: FinalResult[] = [];
     const validRoles = Object.values(Role);
-    const emailQueue: Array<{ email: string; name: string; password: string }> = [];
 
     // Extraer datos únicos para verificación masiva
     const uniqueDocuments = [...new Set(validUsers.map(u => u.data?.document).filter(Boolean))];
@@ -601,10 +575,6 @@ export async function POST(request: Request) {
         emailVerified: new Date(),
       });
 
-      // Agregar a colas
-      const emailToSend = institutionalEmail || personalEmail;
-      emailQueue.push({ email: emailToSend, name, password: plainPassword });
-
       // Marcar como existente para evitar duplicados en el mismo batch
       existingDocs.add(document);
       existingEmailsSet.add(personalEmail);
@@ -648,19 +618,6 @@ export async function POST(request: Request) {
             });
           }
         }
-      }
-    }
-
-    // Enviar correos de bienvenida en lotes
-    const EMAIL_BATCH_SIZE = 3;
-    for (let i = 0; i < emailQueue.length; i += EMAIL_BATCH_SIZE) {
-      const emailBatch = emailQueue.slice(i, i + EMAIL_BATCH_SIZE);
-      Promise.all(
-        emailBatch.map(({ email, name, password }) => sendWelcomeEmailAsync(email, name, password))
-      ).catch(() => {});
-
-      if (i + EMAIL_BATCH_SIZE < emailQueue.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
 

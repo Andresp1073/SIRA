@@ -3,15 +3,11 @@
  * Fixed: Resolving Turbopack parsing error by cleaning structure.
  */
 
-import ClassCancellationEmail from '@/app/emails/ClassCancellationEmail';
 import { authOptions } from '@/lib/auth';
-import { clearSubjectCache } from '@/lib/cache';
-import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { revalidatePath } from 'next/cache';
 import { NextResponse } from 'next/server';
-import React from 'react';
 import { DocenteClaseDetailSchema, DocenteClaseUpdateSchema } from './schema';
 
 // --- Helpers ---
@@ -20,15 +16,15 @@ async function verifyTeacherOwnership(classId: string, teacherId: string) {
   const classWithRelations = await db.class.findUnique({
     where: { id: classId },
     include: { 
-      subject: { select: { teacherIds: true } },
-      group: { select: { teacherIds: true } }
+      subject: { select: { teachers: { select: { teacherId: true } } } },
+      group: { select: { teachers: { select: { teacherId: true } } } }
     },
   });
 
   if (!classWithRelations) return false;
 
-  const inSubject = classWithRelations.subject?.teacherIds?.includes(teacherId) || false;
-  const inGroup = classWithRelations.group?.teacherIds?.includes(teacherId) || false;
+  const inSubject = classWithRelations.subject?.teachers?.some(t => t.teacherId === teacherId) || false;
+  const inGroup = classWithRelations.group?.teachers?.some(t => t.teacherId === teacherId) || false;
 
   return inSubject || inGroup;
 }
@@ -62,15 +58,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ cla
     const classInfo = await db.class.findUnique({
       where: { id: classId },
       include: {
-        subject: { select: { id: true, name: true, code: true, teacherIds: true } },
-        group: { select: { id: true, teacherIds: true } },
+        subject: { select: { id: true, name: true, code: true, teachers: { select: { teacherId: true } } } },
+        group: { select: { id: true, teachers: { select: { teacherId: true } } } },
       },
     });
 
     const hasAccess = 
       classInfo && 
-      (classInfo.subject?.teacherIds?.includes(teacherId) || 
-       classInfo.group?.teacherIds?.includes(teacherId));
+      (classInfo.subject?.teachers?.some(t => t.teacherId === teacherId) || 
+       classInfo.group?.teachers?.some(t => t.teacherId === teacherId));
 
     if (!hasAccess) {
       return NextResponse.json(
@@ -140,60 +136,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ clas
       }
     }
 
-    // Email Notification logic
-    if (status === 'CANCELLED' && reason) {
-      const classToCancel = await db.class.findUnique({
-        where: { id: classId },
-        include: {
-          group: { select: { studentIds: true } },
-          subject: { include: { teachers: { select: { name: true } } } },
-        },
-      });
-
-      if (classToCancel) {
-        const allStudentIds = new Set([
-          ...(classToCancel.subject.studentIds || []),
-          ...(classToCancel.group?.studentIds || []),
-        ]);
-
-        if (allStudentIds.size > 0) {
-          const students = await db.user.findMany({
-            where: { id: { in: Array.from(allStudentIds) } },
-            select: { institutionalEmail: true, personalEmail: true },
-          });
-
-          const studentEmails = students
-            .map(s => s.institutionalEmail || s.personalEmail)
-            .filter((e): e is string => !!e);
-
-          if (studentEmails.length > 0) {
-            console.log(`[API] Notifying ${studentEmails.length} students about cancellation`);
-            const teacherName = classToCancel.subject.teachers[0]?.name || 'El docente';
-            const emailComponent = React.createElement(ClassCancellationEmail, {
-              subjectName: classToCancel.subject.name,
-              teacherName,
-              classDate: classToCancel.date.toISOString(),
-              reason,
-              supportEmail: process.env.SUPPORT_EMAIL || 'soporte@sira-fup.online',
-              loginUrl: `${process.env.NEXTAUTH_URL}/login`,
-            });
-
-            const emailPromises = studentEmails.map(to =>
-              sendEmail({
-                to,
-                subject: `Clase Cancelada: ${classToCancel.subject.name}`,
-                react: emailComponent,
-              }).catch(err => {
-                console.error(`[API] Failed email to ${to}:`, err);
-                return { success: false };
-              })
-            );
-            await Promise.all(emailPromises);
-          }
-        }
-      }
-    }
-
     const updatedClass = await db.class.update({
       where: { id: classId },
       data: {
@@ -216,7 +158,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ clas
       );
     }
 
-    await clearSubjectCache(updatedClass.subject.id);
     const revalidateId = updatedClass.groupId || updatedClass.subjectId;
     if (revalidateId) {
       revalidatePath(`/dashboard/docente/grupos/${revalidateId}`);
@@ -245,19 +186,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   }
 
   try {
-    const classToDelete = await db.class.findUnique({
+    await db.class.delete({
       where: { id: classId },
-      select: { subjectId: true },
     });
-
-    const deleted = await db.class.delete({
-      where: { id: classId },
-      include: { subject: true },
-    });
-
-    if (classToDelete) {
-      await clearSubjectCache(classToDelete.subjectId);
-    }
 
     return NextResponse.json({ message: 'Clase eliminada con éxito' });
   } catch (error) {

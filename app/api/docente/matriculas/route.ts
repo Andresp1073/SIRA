@@ -22,21 +22,21 @@ export async function GET(request: Request) {
   // Verificar si el ID es de una Asignatura o un Grupo
   let studentIds: string[] = [];
   let subject = await db.subject.findFirst({
-    where: { id: subjectId, teacherIds: { has: session.user.id } },
-    select: { studentIds: true },
+    where: { id: subjectId, teachers: { some: { teacherId: session.user.id  } } },
+    select: { students: { select: { studentId: true } } },
   });
 
   if (subject) {
-    studentIds = subject.studentIds;
+    studentIds = subject.students.map(s => s.studentId);
   } else {
     // Si no es asignatura, probar con Grupo
     const group = await db.group.findFirst({
-      where: { id: subjectId, teacherIds: { has: session.user.id } },
-      select: { studentIds: true },
+      where: { id: subjectId, teachers: { some: { teacherId: session.user.id  } } },
+      select: { students: { select: { studentId: true } } },
     });
 
     if (group) {
-      studentIds = group.studentIds;
+      studentIds = group.students.map(s => s.studentId);
     } else {
       return NextResponse.json(
         {
@@ -102,8 +102,8 @@ export async function POST(request: Request) {
 
   // Verificar que el docente es el propietario de la asignatura
   const subject = await db.subject.findFirst({
-    where: { id: subjectId, teacherIds: { has: session.user.id } },
-    select: { studentIds: true },
+    where: { id: subjectId, teachers: { some: { teacherId: session.user.id  } } },
+    select: { students: { select: { studentId: true } } },
   });
 
   // Get all groups for this subject
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
   }
 
   // Verificar si el estudiante ya está matriculado
-  if (subject.studentIds.includes(studentId)) {
+  if (subject.students.some(s => s.studentId === studentId)) {
     return NextResponse.json(
       { message: 'El estudiante ya está matriculado en esta asignatura' },
       { status: 409 }
@@ -139,14 +139,16 @@ export async function POST(request: Request) {
   // Matricular al estudiante actualizando Subject y Groups en una transacción
   try {
     const updateOperations = [
-      db.subject.update({
-        where: { id: subjectId },
-        data: { studentIds: { push: studentId } },
+      db.studentEnrollment.upsert({
+        where: { studentId_subjectId: { studentId, subjectId } },
+        update: {},
+        create: { studentId, subjectId },
       }),
       ...groups.map(group =>
-        db.group.update({
-          where: { id: group.id },
-          data: { studentIds: { push: studentId } },
+        db.studentGroup.upsert({
+          where: { studentId_groupId: { studentId, groupId: group.id } },
+          update: {},
+          create: { studentId, groupId: group.id },
         })
       ),
     ];

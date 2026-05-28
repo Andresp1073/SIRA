@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
         id: true,
         code: true,
         name: true,
-        studentIds: true,
+        students: { select: { studentId: true } },
       },
     });
 

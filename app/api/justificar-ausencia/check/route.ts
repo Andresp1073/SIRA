@@ -28,9 +28,9 @@ export async function GET(request: Request) {
   if (role === Role.DOCENTE) {
     const cls = await db.class.findUnique({
       where: { id: classId },
-      include: { group: { select: { teacherIds: true } } },
+      include: { group: { select: { teachers: { select: { teacherId: true } } } } },
     });
-    if (!cls?.group?.teacherIds.includes(session.user.id)) {
+    if (!cls?.group?.teachers.some(t => t.teacherId === session.user.id)) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 403 });
     }
   }

@@ -94,8 +94,8 @@ export async function GET(
         ...dateFilter,
         ...subjectFilterClause,
         OR: [
-          { subject: { teacherIds: { has: docenteId } } },
-          { group: { teacherIds: { has: docenteId } } },
+          { subject: { teachers: { some: { teacherId: docenteId  } } } },
+          { group: { teachers: { some: { teacherId: docenteId  } } } },
         ],
       },
       include: {

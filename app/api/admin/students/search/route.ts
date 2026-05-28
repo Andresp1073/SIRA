@@ -20,12 +20,11 @@ export async function GET(request: Request) {
       ...(query
         ? {
             OR: [
-              { document: { contains: query, mode: Prisma.QueryMode.insensitive } },
-              { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+              { document: { contains: query } },
+              { name: { contains: query } },
               {
                 institutionalEmail: {
                   contains: query,
-                  mode: Prisma.QueryMode.insensitive,
                 },
               },
             ],

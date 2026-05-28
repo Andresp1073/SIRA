@@ -1,6 +1,5 @@
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/prisma';
-import { redis } from '@/lib/redis';
 import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
 
@@ -12,22 +11,9 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // CACHE: Try to get from cache first (5 minutes TTL)
-    const cacheKey = `dashboard:docente:${session.user.id}`;
-    let cached = null;
-    try {
-      cached = await redis.get(cacheKey);
-      if (cached) {
-        return NextResponse.json(cached);
-      }
-    } catch {
-      // Cache not available, continue without cache
-    }
-
-    // Query groups where the teacher is assigned
     const groups = await db.group.findMany({
       where: {
-        teacherIds: { has: session.user.id },
+        teachers: { some: { teacherId: session.user.id  } },
       },
       include: {
         subject: {
@@ -62,7 +48,6 @@ export async function GET() {
 
     const now = new Date();
 
-    // Process each group as a subject entry (with groupId for navigation)
     const processedSubjects = groups.map(group => {
       const totalClasses = group.classes.length;
       const completedClasses = group.classes.filter(
@@ -100,7 +85,6 @@ export async function GET() {
       };
     });
 
-    // Get the 3 upcoming classes closest to now
     const upcomingClasses = groups
       .flatMap(group =>
         group.classes
@@ -126,7 +110,6 @@ export async function GET() {
       )
       .slice(0, 3);
 
-    // Get the last 3 classes with low progress (below 50%)
     const lowProgressClasses = groups
       .flatMap(group =>
         group.classes
@@ -158,13 +141,6 @@ export async function GET() {
       lowProgressClasses,
       upcomingClasses,
     };
-
-    // CACHE: Store in cache for 5 minutes (300 seconds)
-    try {
-      await redis.set(cacheKey, response, { ex: 300 });
-    } catch {
-      // Cache not available, continue without caching
-    }
 
     return NextResponse.json(response);
   } catch (error) {

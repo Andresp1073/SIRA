@@ -131,7 +131,7 @@ export async function POST(req: Request) {
               code: body.groupCode,
               subjectId: subjectForGroup.id,
               academicPeriod: periodo,
-              teacherIds: [],
+
               scheduleId: schedule.id,
               roomId: roomId ?? undefined,
             },

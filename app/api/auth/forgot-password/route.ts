@@ -1,8 +1,5 @@
-import ResetPasswordEmail from '@/app/emails/ResetPasswordEmail';
-import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
-import React from 'react';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +9,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'El correo electrónico es requerido' }, { status: 400 });
     }
 
-    // Buscar usuario por correo institucional o personal
     const user = await db.user.findFirst({
       where: {
         OR: [{ institutionalEmail: correo }, { personalEmail: correo }],
@@ -29,12 +25,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generar token de reset
     const resetToken = crypto.randomUUID();
-    // Sync with ResetPasswordEmail.tsx which says 24 hours
     const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // Guardar token en la base de datos
     await db.user.update({
       where: { id: user.id },
       data: {
@@ -42,35 +35,6 @@ export async function POST(request: NextRequest) {
         resetTokenExpiry,
       },
     });
-
-    // Renderizar y enviar el correo electrónico
-    try {
-      const emailResult = await sendEmail({
-        to: correo,
-        subject: 'Restablece tu contraseña - Sistema de Asistencias FUP',
-        react: React.createElement(ResetPasswordEmail, {
-          resetUrl: `${process.env.NEXTAUTH_URL}/reset-password/${resetToken}`,
-          userEmail: user.institutionalEmail || user.personalEmail || '',
-          supportEmail: process.env.SUPPORT_EMAIL || 'soporte@fup.edu.co',
-        }),
-      });
-
-      if (!emailResult.success) {
-        throw new Error('Email sending failed unexpectedly');
-      }
-    } catch (error) {
-      console.error('Detailed error in forgot-password email sending:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        correo,
-        userId: user.id,
-      });
-
-      return NextResponse.json(
-        { message: 'Error al enviar el correo de restablecimiento. Por favor, intenta de nuevo.' },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json(
       {

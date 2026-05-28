@@ -19,10 +19,10 @@ export async function GET(req: NextRequest) {
         ...(search
           ? {
               OR: [
-                { name: { contains: search, mode: 'insensitive' } },
-                { institutionalEmail: { contains: search, mode: 'insensitive' } },
-                { teacherCode: { contains: search, mode: 'insensitive' } },
-                { studentCode: { contains: search, mode: 'insensitive' } },
+                { name: { contains: search } },
+                { institutionalEmail: { contains: search } },
+                { teacherCode: { contains: search } },
+                { studentCode: { contains: search } },
               ],
             }
           : {}),

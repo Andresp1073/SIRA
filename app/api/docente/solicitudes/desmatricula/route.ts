@@ -1,21 +1,16 @@
-import UnenrollRequestEmail from '@/app/emails/UnenrollRequestEmail';
 import { authOptions } from '@/lib/auth';
-import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { NextResponse } from 'next/server';
-import React from 'react';
 
 export async function POST(request: Request) {
   try {
-    // Verificar autenticación
     const session = await getServerSession(authOptions);
 
     if (!session) {
       return NextResponse.json({ message: 'No autorizado' }, { status: 401 });
     }
 
-    // Verificar que el usuario tenga el rol de docente
     if (session.user.role !== 'DOCENTE') {
       return NextResponse.json(
         { message: 'No tienes permiso para realizar esta acción' },
@@ -23,19 +18,16 @@ export async function POST(request: Request) {
       );
     }
 
-    // Obtener datos de la solicitud
     const { studentId, subjectId, reason } = await request.json();
 
-    // Validar datos requeridos
     if (!studentId || !subjectId || !reason) {
       return NextResponse.json({ message: 'Faltan campos requeridos' }, { status: 400 });
     }
 
-    // Verificar que la asignatura exista y pertenezca al docente
     const subject = await db.subject.findFirst({
       where: {
         id: subjectId,
-        teacherIds: { has: session.user.id },
+        teachers: { some: { teacherId: session.user.id  } },
       },
     });
 
@@ -46,7 +38,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Checking for 12-day rule
     const firstClass = await db.class.findFirst({
       where: { subjectId: subjectId },
       orderBy: { date: 'asc' },
@@ -63,7 +54,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Verificar que el estudiante exista
     const student = await db.user.findUnique({
       where: { id: studentId },
       select: { id: true, name: true },
@@ -73,7 +63,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Estudiante no encontrado' }, { status: 404 });
     }
 
-    // Verificar si ya existe una solicitud pendiente para este estudiante y asignatura
     const existingRequest = await (db as any).unenrollRequest.findFirst({
       where: {
         studentId,
@@ -89,10 +78,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Crear la solicitud de desmatriculación
-
     try {
-      // Crear la solicitud de desmatriculación usando el modelo extendido
       const unenrollRequest = await (db as any).unenrollRequest.create({
         data: {
           student: { connect: { id: studentId } },
@@ -110,32 +96,6 @@ export async function POST(request: Request) {
           },
         },
       });
-
-      // Notificar al administrador por correo electrónico
-      try {
-        const supportEmail = process.env.SUPPORT_EMAIL || 'soporte@sira-fup.online';
-        const adminEmail = process.env.ADMIN_EMAIL || 'elustondo129@gmail.com';
-
-        // Get subject name from the database
-        const subjectData = await db.subject.findUnique({
-          where: { id: unenrollRequest.subjectId },
-          select: { name: true },
-        });
-
-        // Send email to admin
-        await sendEmail({
-          to: adminEmail,
-          subject: `Solicitud de Desmatriculación - ${subjectData?.name || 'Asignatura'}`,
-          react: React.createElement(UnenrollRequestEmail, {
-            studentName: unenrollRequest.student?.name || 'Estudiante',
-            studentEmail: unenrollRequest.student?.institutionalEmail || 'No especificado',
-            subjectName: subjectData?.name || 'Asignatura',
-            reason: unenrollRequest.reason,
-            requestDate: unenrollRequest.createdAt.toISOString(),
-            supportEmail: supportEmail,
-          }),
-        });
-      } catch (emailError) {}
 
       return NextResponse.json({
         success: true,

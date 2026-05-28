@@ -22,12 +22,16 @@ export async function GET(request: NextRequest) {
       },
       include: {
         students: {
-          select: {
-            id: true,
-            name: true,
-            document: true,
-            institutionalEmail: true,
-            studentCode: true,
+          include: {
+            student: {
+              select: {
+                id: true,
+                name: true,
+                document: true,
+                institutionalEmail: true,
+                studentCode: true,
+              },
+            },
           },
         },
         subject: {
@@ -49,7 +53,7 @@ export async function GET(request: NextRequest) {
         subjectName: g.subject.name,
         subjectCode: g.subject.code,
         academicPeriod: g.academicPeriod,
-        students: g.students,
+        students: g.students.map(s => s.student),
       })),
     });
   } catch (error) {
@@ -72,20 +76,21 @@ export async function DELETE(request: NextRequest) {
 
     const group = await db.group.findUnique({
       where: { id: groupId },
-      select: { studentIds: true, subjectId: true },
+      select: { students: { select: { studentId: true } }, subjectId: true },
     });
 
     if (!group) {
       return NextResponse.json({ error: 'Grupo no encontrado' }, { status: 404 });
     }
 
-    const updatedStudentIds = group.studentIds.filter(id => id !== studentId);
+    const updatedStudentIds = group.students.map(s => s.studentId).filter(id => id !== studentId);
 
     await db.group.update({
       where: { id: groupId },
       data: {
-        studentIds: {
-          set: updatedStudentIds,
+        students: {
+          deleteMany: {},
+          create: updatedStudentIds.map(id => ({ studentId: id })),
         },
       },
     });
@@ -94,14 +99,16 @@ export async function DELETE(request: NextRequest) {
     if (group.subjectId) {
       const subject = await db.subject.findUnique({
         where: { id: group.subjectId },
-        select: { studentIds: true },
+        select: { students: { select: { studentId: true } } },
       });
       if (subject) {
+        const updatedSubjectIds = subject.students.map(s => s.studentId).filter(id => id !== studentId);
         await db.subject.update({
           where: { id: group.subjectId },
           data: {
-            studentIds: {
-              set: subject.studentIds.filter(id => id !== studentId),
+            students: {
+              deleteMany: {},
+              create: updatedSubjectIds.map(id => ({ studentId: id })),
             },
           },
         });
@@ -226,10 +233,10 @@ export async function POST(request: Request) {
         academicPeriod: { in: periods },
         subject: { code: { in: subjectCodes } },
       },
-      include: { subject: { select: { code: true } } },
+      include: { subject: { select: { code: true } }, students: { select: { studentId: true } } },
     });
 
-    const groupMap = new Map();
+    const groupMap = new Map<string, (typeof allGroups)[number]>();
     for (const g of allGroups) {
       groupMap.set(`${g.subject.code}-${g.code}-${g.academicPeriod}`, g);
     }
@@ -279,7 +286,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const isAlreadyEnrolled = group.studentIds.includes(student.id);
+      const isAlreadyEnrolled = group.students?.some(s => s.studentId === student.id) ?? false;
       if (isAlreadyEnrolled) {
         results.push({
           studentDocument: row.studentDocument,
@@ -327,24 +334,19 @@ export async function POST(request: Request) {
     await db.$transaction(async tx => {
       for (const item of toCreate) {
         if (!item.studentId || !item.groupId) continue;
-        await tx.group.update({
-          where: { id: item.groupId },
+        await tx.studentGroup.create({
           data: {
-            studentIds: {
-              push: item.studentId,
-            },
+            studentId: item.studentId,
+            groupId: item.groupId,
           },
         });
-        // Also add to subject studentIds for backward compatibility/fast lookup
+        // Also add to subject enrollment
         const group = allGroups.find(g => g.id === item.groupId);
         if (group?.subjectId) {
-          await tx.subject.update({
-            where: { id: group.subjectId },
-            data: {
-              studentIds: {
-                push: item.studentId,
-              },
-            },
+          await tx.studentEnrollment.upsert({
+            where: { studentId_subjectId: { studentId: item.studentId, subjectId: group.subjectId } },
+            update: {},
+            create: { studentId: item.studentId, subjectId: group.subjectId },
           });
         }
       }

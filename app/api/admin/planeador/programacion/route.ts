@@ -177,10 +177,30 @@ export async function POST(req: Request) {
       existingRooms.map(r => [r.name.trim().toLowerCase(), r])
     );
 
+    // Filter out rows where ALL key fields are empty (e.g. blank rows from Excel export)
+    const nonEmptyRows = parsed.data.filter(row => {
+      const periodo = getValue(row, periodoH);
+      const codigo = getValue(row, codigoH);
+      const grupo = getValue(row, grupoH);
+      const diaRaw = getValue(row, diaH);
+      const horaInicio = getValue(row, inicioH);
+      const horaFin = getValue(row, finH);
+      const salon = salonH ? getValue(row, salonH) : '';
+      return periodo || codigo || grupo || diaRaw || horaInicio || horaFin || salon;
+    });
+
+    if (nonEmptyRows.length === 0) {
+      const errorMsg = 'El archivo no contiene filas para importar.';
+      if (isPreview) {
+        return NextResponse.json({ success: true, previewData: [] });
+      }
+      return NextResponse.json({ error: errorMsg }, { status: 400 });
+    }
+
     // Build previews
     const previews: ProgramacionPreview[] = [];
 
-    for (const row of parsed.data) {
+    for (const row of nonEmptyRows) {
       const periodo = getValue(row, periodoH);
       const codigo = getValue(row, codigoH);
       const grupo = getValue(row, grupoH);

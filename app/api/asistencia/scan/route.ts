@@ -132,11 +132,15 @@ export async function POST(request: Request) {
     }
 
     const subject = group.subject;
-    const studentIds = group.studentIds || [];
+    const studentIds: string[] = [];
+    // student enrollment check moved below using students relation
     // 6. El QR activo (qrTokenExpiresAt > now) ya garantiza que la clase está en curso.
     //    No se valida horario adicional para evitar falsos positivos por zona horaria.
     // 7. Verificar si el estudiante está matriculado en el grupo
-    const isEnrolled = studentIds.includes(session.user.id);
+    const enrollment = await db.studentGroup.findUnique({
+      where: { studentId_groupId: { studentId: session.user.id, groupId: group.id } },
+    });
+    const isEnrolled = !!enrollment;
     if (!isEnrolled) {
       return createErrorResponse('NOT_ENROLLED');
     }
@@ -160,10 +164,6 @@ export async function POST(request: Request) {
         createdAt: new Date(),
       },
     });
-
-    // CACHE: Invalidate cache for this subject (affects student and teacher)
-    const { clearSubjectCache } = await import('@/lib/cache');
-    await clearSubjectCache(subject.id);
 
     // Validar respuesta con Zod
     const attendanceResponse = {

@@ -1,5 +1,4 @@
 import { authOptions } from '@/lib/auth';
-import { clearSubjectCache } from '@/lib/cache';
 import { db } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
@@ -9,15 +8,15 @@ async function verifyTeacherOwnership(classId: string, teacherId: string) {
   const cls = await db.class.findUnique({
     where: { id: classId },
     include: { 
-      subject: { select: { teacherIds: true } },
-      group: { select: { teacherIds: true } }
+      subject: { select: { teachers: { select: { teacherId: true } } } },
+      group: { select: { teachers: { select: { teacherId: true } } } }
     },
   });
   
   if (!cls) return false;
 
-  const inSubject = cls.subject?.teacherIds?.includes(teacherId) ?? false;
-  const inGroup = cls.group?.teacherIds?.includes(teacherId) ?? false;
+  const inSubject = cls.subject?.teachers?.some(t => t.teacherId === teacherId) ?? false;
+  const inGroup = cls.group?.teachers?.some(t => t.teacherId === teacherId) ?? false;
 
   return inSubject || inGroup;
 }
@@ -41,13 +40,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ clas
           select: {
             id: true,
             name: true,
-            studentIds: true,
+            students: { select: { studentId: true } },
           },
         },
         group: {
           select: {
             id: true,
-            studentIds: true,
+            students: { select: { studentId: true } },
           },
         },
       },
@@ -59,8 +58,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ clas
 
     const { subject, group } = classInfo;
     const allStudentIds = Array.from(new Set([
-      ...(subject.studentIds || []),
-      ...(group?.studentIds || []),
+      ...(subject.students?.map(s => s.studentId) || []),
+      ...(group?.students?.map(s => s.studentId) || []),
     ]));
 
     const students = await db.user.findMany({
@@ -131,10 +130,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
       })
     );
     await db.$transaction(upsertOperations);
-
-    if (classInfo) {
-      await clearSubjectCache(classInfo.subjectId);
-    }
 
     return NextResponse.json({ message: 'Asistencia guardada con éxito' }, { status: 200 });
   } catch (error) {

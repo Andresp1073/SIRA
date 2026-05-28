@@ -64,12 +64,12 @@ export default async function PreviewPage({ params }: PageProps) {
     where: { id },
     include: {
       teachers: {
-        select: { id: true, name: true, signatureUrl: true },
+        include: { teacher: { select: { id: true, name: true, signatureUrl: true } } },
       },
       subject: {
         include: {
           teachers: {
-            select: { id: true, name: true, signatureUrl: true },
+            include: { teacher: { select: { id: true, name: true, signatureUrl: true } } },
           },
         },
       },
@@ -106,7 +106,7 @@ export default async function PreviewPage({ params }: PageProps) {
       where: { id },
       include: {
         teachers: {
-          select: { id: true, name: true, signatureUrl: true },
+          include: { teacher: { select: { id: true, name: true, signatureUrl: true } } },
         },
         classes: {
           where: { weekId: { not: null } },
@@ -132,7 +132,7 @@ export default async function PreviewPage({ params }: PageProps) {
   // Admin tiene acceso a todos los grupos, no necesita verificación de teacherIds
 
   // Consolidar docentes (dar prioridad a los del grupo)
-  const allTeachers = [...(grupoData?.teachers ?? []), ...(subject?.teachers ?? [])];
+  const allTeachers = [...(grupoData?.teachers?.map((t: { teacher: { id: string; name: string | null; signatureUrl: string | null } }) => t.teacher) ?? []), ...(subject?.teachers?.map((t: { teacher: { id: string; name: string | null; signatureUrl: string | null } }) => t.teacher) ?? [])];
 
   const teacherName = allTeachers[0]?.name ?? 'Docente';
   const signatureUrl = allTeachers[0]?.signatureUrl ?? null;

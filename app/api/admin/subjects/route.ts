@@ -28,9 +28,9 @@ export async function GET(req: NextRequest) {
     // Agregar búsqueda si existe
     if (search) {
       whereClause.OR = [
-        { name: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { code: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        { program: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        { name: { contains: search } },
+        { code: { contains: search } },
+        { program: { contains: search } },
       ];
     }
 
@@ -48,19 +48,22 @@ export async function GET(req: NextRequest) {
     // Obtener asignaturas con paginación
     const includeObj: Prisma.SubjectInclude = {
       teachers: {
-        select: {
-          id: true,
-          name: true,
-          institutionalEmail: true,
-          teacherCode: true,
+        include: {
+          teacher: {
+            select: {
+              id: true,
+              name: true,
+              institutionalEmail: true,
+              teacherCode: true,
+            },
+          },
         },
       },
-      // Since enrollments is gone, we'll fetch students manually or through groups
-      // For now, let's just include the count of groups or classes
       _count: {
         select: {
           classes: true,
           groups: true,
+          students: true,
         },
       },
     };
@@ -84,7 +87,7 @@ export async function GET(req: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const subjectsWithCounts = subjects.map((subject: any) => ({
       ...subject,
-      studentCount: subject.studentIds?.length || 0,
+      studentCount: subject._count?.students || 0,
       classCount: subject._count?.classes || 0,
       groupCount: subject._count?.groups || 0,
       students: [], // We'd need a separate fetch for students if needed, but for list view count is enough
@@ -165,15 +168,19 @@ export async function POST(req: NextRequest) {
         program,
         semester: semester ? parseInt(semester) : null,
         credits: credits ? parseInt(credits) : null,
-        teacherIds: teacherId ? [teacherId] : [],
+        ...(teacherId ? { teachers: { create: { teacherId } } } : {}),
       },
       include: {
         teachers: {
-          select: {
-            id: true,
-            name: true,
-            institutionalEmail: true,
-            teacherCode: true,
+          include: {
+            teacher: {
+              select: {
+                id: true,
+                name: true,
+                institutionalEmail: true,
+                teacherCode: true,
+              },
+            },
           },
         },
       },

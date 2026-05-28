@@ -38,7 +38,8 @@ export async function GET(request: Request) {
     });
 
     const subjects = await db.subject.findMany({
-      where: { teacherIds: { has: session.user.id } },
+      where: { teachers: { some: { teacherId: session.user.id  } } },
+      include: { teachers: { select: { teacherId: true } } },
       orderBy: { [query.sortBy]: query.sortOrder },
     });
 
@@ -49,10 +50,10 @@ export async function GET(request: Request) {
           return subjectPeriod === period;
         })
       : subjects;
-    // Map Prisma shape (teacherIds) to schema shape (teacherId) for validation
+    // Map Prisma shape (teachers) to schema shape (teacherId) for validation
     const mappedForValidation = filteredSubjects.map(subject => ({
       ...subject,
-      teacherId: subject.teacherIds?.[0] ?? '',
+      teacherId: subject.teachers?.[0]?.teacherId ?? '',
     }));
     const validados = z.array(DocenteSubjectSchema).safeParse(mappedForValidation);
     if (!validados.success) {
@@ -112,12 +113,13 @@ export async function POST(request: Request) {
         ...data,
         semester: data.semester === undefined ? null : data.semester,
         credits: data.credits === undefined ? null : data.credits,
-        teacherIds: [session.user.id],
+        teachers: { create: { teacherId: session.user.id } },
       },
+      include: { teachers: { select: { teacherId: true } } },
     });
     const validado = DocenteSubjectSchema.safeParse({
       ...newSubject,
-      teacherId: newSubject.teacherIds?.[0] ?? '',
+      teacherId: newSubject.teachers?.[0]?.teacherId ?? '',
     });
     if (!validado.success) {
       return NextResponse.json(
@@ -154,8 +156,9 @@ export async function PUT(request: Request) {
     const data = DocenteSubjectUpdateSchema.parse(body);
     const subjectToUpdate = await db.subject.findUnique({
       where: { id: data.id },
+      include: { teachers: { select: { teacherId: true } } },
     });
-    if (!subjectToUpdate || !subjectToUpdate.teacherIds.includes(session.user.id)) {
+    if (!subjectToUpdate || !subjectToUpdate.teachers.some(t => t.teacherId === session.user.id)) {
       return NextResponse.json(
         {
           message: 'Asignatura no encontrada o no tienes permiso para editarla',
@@ -175,7 +178,7 @@ export async function PUT(request: Request) {
     });
     const validado = DocenteSubjectSchema.safeParse({
       ...updatedSubject,
-      teacherId: updatedSubject.teacherIds?.[0] ?? '',
+      teacherId: (updatedSubject as any).teachers?.[0]?.teacherId ?? '',
     });
     if (!validado.success) {
       return NextResponse.json(
@@ -211,8 +214,8 @@ export async function DELETE(request: Request) {
     const body = await request.json();
     const schema = z.object({ id: z.string() });
     const { id } = schema.parse(body);
-    const subjectToDelete = await db.subject.findUnique({ where: { id } });
-    if (!subjectToDelete || !subjectToDelete.teacherIds.includes(session.user.id)) {
+    const subjectToDelete = await db.subject.findUnique({ where: { id }, include: { teachers: { select: { teacherId: true } } } });
+    if (!subjectToDelete || !subjectToDelete.teachers.some(t => t.teacherId === session.user.id)) {
       return NextResponse.json(
         {
           message: 'Asignatura no encontrada o no tienes permiso para eliminarla',

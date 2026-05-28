@@ -50,9 +50,9 @@ export async function GET(req: NextRequest) {
     const where: Prisma.UserWhereInput = {
       role: Role.ESTUDIANTE,
       OR: [
-        { name: { contains: searchTerm, mode: 'insensitive' } },
-        { institutionalEmail: { contains: searchTerm, mode: 'insensitive' } },
-        { personalEmail: { contains: searchTerm, mode: 'insensitive' } },
+        { name: { contains: searchTerm } },
+        { institutionalEmail: { contains: searchTerm } },
+        { personalEmail: { contains: searchTerm } },
       ],
     };
 

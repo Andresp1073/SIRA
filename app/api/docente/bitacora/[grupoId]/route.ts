@@ -13,13 +13,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ grupoId
     const group = await db.group.findFirst({
       where: {
         id: groupId,
-        teacherIds: { has: session.user.id },
+        teachers: { some: { teacherId: session.user.id  } },
       },
       include: {
         subject: { select: { name: true, code: true } },
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },
         room: { select: { name: true } },
-        teachers: { select: { name: true, institutionalEmail: true } },
+        teachers: { include: { teacher: { select: { name: true, institutionalEmail: true } } } },
         planning: {
           include: {
             weeks: {

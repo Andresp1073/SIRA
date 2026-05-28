@@ -13,19 +13,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ docente
     const { docenteId } = await params;
 
     const groups = await db.group.findMany({
-      where: { teacherIds: { has: docenteId } },
+      where: { teachers: { some: { teacherId: docenteId  } } },
       include: {
         subject: { select: { id: true, name: true, code: true, credits: true } },
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },
         room: { select: { name: true, type: true } },
         planning: { select: { id: true, weeks: { select: { number: true } } } },
+        students: { select: { studentId: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     const groupsWithStats = await Promise.all(
       groups.map(async g => {
-        const totalStudents = g.studentIds?.length || 0;
+        const totalStudents = g.students.length;
 
         const classesCount = await db.class.count({
           where: { groupId: g.id },

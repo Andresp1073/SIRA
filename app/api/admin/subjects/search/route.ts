@@ -20,12 +20,12 @@ export async function GET(request: Request) {
     const whereClause: Prisma.SubjectWhereInput = query
       ? {
           OR: [
-            { code: { contains: query, mode: Prisma.QueryMode.insensitive } },
-            { name: { contains: query, mode: Prisma.QueryMode.insensitive } },
+            { code: { contains: query } },
+            { name: { contains: query } },
             {
               teachers: {
                 some: {
-                  name: { contains: query, mode: Prisma.QueryMode.insensitive },
+                  teacher: { name: { contains: query } },
                 },
               },
             },
@@ -37,12 +37,17 @@ export async function GET(request: Request) {
       where: whereClause,
       include: {
         teachers: {
-          select: {
-            id: true,
-            name: true,
-            institutionalEmail: true,
+          include: {
+            teacher: {
+              select: {
+                id: true,
+                name: true,
+                institutionalEmail: true,
+              },
+            },
           },
         },
+        _count: { select: { students: true } },
       },
       take: 50,
       orderBy: {
@@ -61,16 +66,11 @@ export async function GET(request: Request) {
         credits: subject.credits,
         teacher: subject.teachers[0]
           ? {
-              id: subject.teachers[0].id,
-              name: subject.teachers[0].name,
+              id: subject.teachers[0].teacher.id,
+              name: subject.teachers[0].teacher.name,
             }
           : null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        studentCount:
-          (subject as any).groups?.reduce(
-            (sum: number, g: any) => sum + (g.studentIds?.length || 0),
-            0
-          ) || 0,
+        studentCount: subject._count?.students || 0,
       })),
     });
   } catch (error) {

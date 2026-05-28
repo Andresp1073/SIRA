@@ -49,12 +49,6 @@ export async function POST(req: Request) {
       data: { password: hashedPassword, mustChangePassword: false },
     });
 
-    // Invalidate user cache
-    const emails = [user.personalEmail, user.institutionalEmail].filter(Boolean) as string[];
-    // @ts-ignore - Dynamic import
-    const { clearAllUserCache } = await import('@/lib/cache');
-    await clearAllUserCache(session.user.id, emails);
-
     return NextResponse.json({ message: 'Contraseña actualizada exitosamente' });
   } catch (error) {
     return NextResponse.json({ error: 'Error al cambiar la contraseña' }, { status: 500 });

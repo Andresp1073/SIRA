@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 
 import { authOptions } from '@/lib/auth';
-import { clearSubjectCache } from '@/lib/cache';
 import { db } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
@@ -47,8 +46,8 @@ export async function GET(request: Request) {
       where: {
         id: query.subjectId,
         OR: [
-          { teacherIds: { has: session.user.id } },
-          { groups: { some: { teacherIds: { has: session.user.id } } } },
+          { teachers: { some: { teacherId: session.user.id  } } },
+          { groups: { some: { teachers: { some: { teacherId: session.user.id  } } } } },
         ],
       },
     });
@@ -58,7 +57,7 @@ export async function GET(request: Request) {
       const group = await db.group.findFirst({
         where: {
           id: query.subjectId,
-          teacherIds: { has: session.user.id },
+          teachers: { some: { teacherId: session.user.id  } },
         },
         include: { subject: true },
       });
@@ -194,12 +193,12 @@ export async function POST(request: Request) {
     let groupIdToUse: string | null = null;
 
     let subject = await db.subject.findFirst({
-      where: { id: data.subjectId, teacherIds: { has: session.user.id } },
+      where: { id: data.subjectId, teachers: { some: { teacherId: session.user.id  } } },
     });
 
     if (!subject) {
       const group = await db.group.findFirst({
-        where: { id: data.subjectId, teacherIds: { has: session.user.id } },
+        where: { id: data.subjectId, teachers: { some: { teacherId: session.user.id  } } },
       });
       if (group) {
         subjectIdToUse = group.subjectId;
@@ -234,12 +233,12 @@ export async function POST(request: Request) {
       select: {
         subjectId: true,
         classroom: true,
-        subject: { select: { teacherIds: true } },
+        subject: { select: { teachers: { select: { teacherId: true } } } },
       },
     });
 
     const teacherCollision = (existingClasses as any[]).find(cls =>
-      cls.subject?.teacherIds?.includes(session.user.id)
+      cls.subject?.teachers?.some((t: { teacherId: string }) => t.teacherId === session.user.id)
     );
     if (teacherCollision) {
       return NextResponse.json(
@@ -280,8 +279,6 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
-    await clearSubjectCache(subjectIdToUse);
 
     return NextResponse.json(
       { data: validado.data, message: 'Clase creada correctamente' },

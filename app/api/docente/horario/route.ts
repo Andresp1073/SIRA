@@ -16,7 +16,7 @@ export async function GET() {
     });
 
     const groups = await db.group.findMany({
-      where: { teacherIds: { has: session.user.id }, scheduleId: { not: null } },
+      where: { teachers: { some: { teacherId: session.user.id  } }, scheduleId: { not: null } },
       include: {
         subject: { select: { name: true, code: true } },
         schedule: true,

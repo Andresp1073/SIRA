@@ -226,7 +226,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             subject: {
               select: {
                 group: true,
-                teacherIds: true,
+                teachers: { select: { teacherId: true } },
                 name: true,
                 code: true,
               },
@@ -259,7 +259,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           // Choque de docente
           if (
             docenteId &&
-            cls.subject.teacherIds.includes(docenteId) &&
+            cls.subject.teachers?.some(t => t.teacherId === docenteId) &&
             cls.subjectId !== subjectId
           ) {
             conflictErrors.push(
@@ -344,8 +344,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
               directHours: subject.directHours ?? undefined,
               description: subject.description ?? undefined,
               academicPeriod: academicPeriod ?? subject.academicPeriod ?? undefined,
-              teacherIds: docenteId ? [docenteId] : [],
-              studentIds: [],
+              ...(docenteId ? { teachers: { create: { teacherId: docenteId } } } : {}),
             },
           });
           created.push(`Grupo ${data.group} - ${data.jornada}`);
@@ -356,10 +355,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             ...(academicPeriod ? { academicPeriod } : {}),
           };
           if (docenteId) {
-            const currentTeacherIds: string[] = targetSubject.teacherIds || [];
-            if (!currentTeacherIds.includes(docenteId)) {
-              updateData.teacherIds = { set: [docenteId] };
-            }
+            await tx.teacherSubject.deleteMany({ where: { subjectId: targetSubject.id } });
+            await tx.teacherSubject.create({ data: { teacherId: docenteId, subjectId: targetSubject.id } });
           }
           await tx.subject.update({
             where: { id: targetSubject.id },

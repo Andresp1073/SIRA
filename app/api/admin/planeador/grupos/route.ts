@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     const groups = await db.group.findMany({
       include: {
         subject: { select: { id: true, name: true, code: true } },
-        teachers: { select: { id: true, name: true } },
+        teachers: { include: { teacher: { select: { id: true, name: true } } } },
         schedule: {
           select: {
             id: true,
@@ -26,14 +26,7 @@ export async function GET(req: NextRequest) {
           },
         },
         room: { select: { id: true, name: true } },
-        planning: {
-          select: {
-            id: true,
-            startDate: true,
-            endDate: true,
-          },
-        },
-        _count: { select: { students: true } },
+        students: { select: { studentId: true } },
         ...(includePlaneacion
           ? {
               planning: {
@@ -50,18 +43,26 @@ export async function GET(req: NextRequest) {
                 },
               },
             }
-          : {}),
+          : {
+              planning: {
+                select: {
+                  id: true,
+                  startDate: true,
+                  endDate: true,
+                },
+              },
+            }),
       },
       orderBy: { createdAt: 'desc' },
     });
     const groupsWithDocentes = groups.map(g => {
-      const { teachers, schedule, room, code, academicPeriod, studentIds, shift, planning, ...rest } = g;
+      const { teachers, schedule, room, code, academicPeriod, shift, planning, students, ...rest } = g;
       return {
         ...rest,
         codigo: code,
         periodoAcademico: academicPeriod,
-        docentes: teachers,
-        estudianteIds: studentIds,
+        docentes: teachers.map(t => t.teacher),
+        estudianteIds: students.map(s => s.studentId),
         shift,
         planning,
         horario: schedule
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
         code: body.codigo,
         subjectId: body.subjectId,
         academicPeriod: body.periodoAcademico,
-        teacherIds: body.docenteIds ?? [],
+        ...(body.docenteIds?.length ? { teachers: { create: body.docenteIds.map((id: string) => ({ teacherId: id })) } } : {}),
         scheduleId: body.horarioId ?? null,
         roomId: body.salaId ?? null,
       },

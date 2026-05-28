@@ -1,9 +1,7 @@
-import ReportReadyEmail from '@/app/emails/ReportReadyEmail';
 import { db } from '@/lib/prisma';
 import { ReportStatus } from '@prisma/client';
 import { Document, Image, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
 import React, { ReactElement } from 'react';
-import { sendEmail } from './email';
 
 declare module '@react-pdf/renderer' {
   interface PDFOptions {
@@ -754,9 +752,13 @@ export async function generateAttendanceReportPDF(
       where: { id: subjectId },
       include: {
         teachers: {
-          select: {
-            name: true,
-            signatureUrl: true,
+          include: {
+            teacher: {
+              select: {
+                name: true,
+                signatureUrl: true,
+              },
+            },
           },
         },
         classes: {
@@ -768,7 +770,7 @@ export async function generateAttendanceReportPDF(
     });
 
     if (!subject) throw new Error('Asignatura no encontrada');
-    if (!subject.teacherIds.includes(teacherId)) throw new Error('No autorizado');
+    if (!subject.teachers.some(t => t.teacherId === teacherId)) throw new Error('No autorizado');
 
     const startDate = new Date(year, period === 1 ? 0 : 6, 1);
     const endDate = new Date(year, period === 1 ? 5 : 11, 31);
@@ -797,7 +799,7 @@ export async function generateAttendanceReportPDF(
 
     // Procesar firma del docente
     let signatureDataUri: string | undefined;
-    const teacher = subject.teachers[0];
+    const teacher = subject.teachers[0]?.teacher;
     if (teacher?.signatureUrl) {
       try {
         if (teacher.signatureUrl.startsWith('http')) {
@@ -840,40 +842,12 @@ export async function generateAttendanceReportPDF(
     const buffer = Buffer.from(arrayBuffer);
     const fileName = `registro-clases-${subject.code}-${period}-${year}-${Date.now()}.pdf`;
 
-    // Enviar notificación por correo si se proporcionó el ID del reporte y el solicitante
-    if (reportId && requestedBy?.personalEmail) {
-      try {
-        await sendEmail({
-          to: requestedBy.personalEmail,
-          subject: `Reporte de asistencia generado - ${subject.name}`,
-          react: ReportReadyEmail({
-            subjectName: subject.name,
-            reportName: fileName,
-            downloadUrl: '', // La URL de descarga debería ser proporcionada por el sistema de almacenamiento
-            userName: requestedBy.name || 'Docente',
-            supportEmail: 'soporte@institucion.edu.co',
-          }),
-        });
-
-        //Actualizar el estado del reporte si se proporcionó un ID
-        if (reportId) {
-          await db.report.update({
-            where: { id: reportId },
-            data: { status: ReportStatus.COMPLETED },
-          });
-        }
-      } catch (emailError) {
-        if (reportId) {
-          await db.report.update({
-            where: { id: reportId },
-            data: {
-              status: ReportStatus.FAILED,
-              error:
-                'El reporte se generó correctamente, pero hubo un error al enviar la notificación por correo.',
-            },
-          });
-        }
-      }
+    // Actualizar el estado del reporte si se proporcionó un ID
+    if (reportId) {
+      await db.report.update({
+        where: { id: reportId },
+        data: { status: ReportStatus.COMPLETED },
+      });
     }
 
     return { buffer, fileName };

@@ -1,12 +1,9 @@
-import ClassNotifyEmail from '@/app/emails/ClassNotifyEmail';
 import { authOptions } from '@/lib/auth';
-import { sendEmail } from '@/lib/email';
 import { db } from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import { GenerarQRResponseSchema } from './schema';
 
-// Endpoint para generar un token QR para una clase específica
 export async function POST(request: Request, { params }: { params: Promise<{ classId: string }> }) {
   const { classId } = await params;
   const session = await getServerSession(authOptions);
@@ -19,7 +16,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
     return NextResponse.json({ message: 'El ID de la clase es requerido' }, { status: 400 });
   }
 
-  // 1. Verificar que la clase existe y cargar relaciones
   const classToUpdate = await db.class.findUnique({
     where: { id: classId },
     include: {
@@ -28,15 +24,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
           id: true,
           code: true,
           name: true,
-          studentIds: true,
-          teacherIds: true,
+          students: { select: { studentId: true } },
+          teachers: { select: { teacherId: true } },
         },
       },
       group: {
         select: {
           id: true,
-          studentIds: true,
-          teacherIds: true,
+          students: { select: { studentId: true } },
+          teachers: { select: { teacherId: true } },
         },
       },
     },
@@ -46,10 +42,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
     return NextResponse.json({ message: 'Clase no encontrada' }, { status: 404 });
   }
 
-  // Verificar pertenencia (sujeto o grupo)
   const isTeacher = 
-    classToUpdate.subject?.teacherIds?.includes(session.user.id) || 
-    classToUpdate.group?.teacherIds?.includes(session.user.id);
+    classToUpdate.subject?.teachers?.some(t => t.teacherId === session.user.id) || 
+    classToUpdate.group?.teachers?.some(t => t.teacherId === session.user.id);
 
   if (!isTeacher) {
     return NextResponse.json(
@@ -58,98 +53,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
     );
   }
 
-  // 2. Verificar si ya se envió una notificación para esta clase
-  const shouldSendNotification = !classToUpdate.notificationSentAt;
-
-  // 3. Generar un token seguro de 32 caracteres
   const generateSecureToken = (): string => {
-    // Generar 16 bytes (32 caracteres hexadecimales)
-    // Usar crypto.getRandomValues para mayor seguridad
     const array = new Uint8Array(16);
     crypto.getRandomValues(array);
     return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   };
 
   const token = generateSecureToken();
-  // Establecer tiempo de expiración (5 minutos desde ahora)
   const expiresAt = new Date();
   expiresAt.setMinutes(expiresAt.getMinutes() + 5);
 
-  // 4. Actualizar la clase con el nuevo token y marca de notificación
   try {
     await db.class.update({
       where: { id: classId },
       data: {
         qrToken: token,
         qrTokenExpiresAt: expiresAt,
-        // Solo actualizar notificationSentAt si es la primera vez
-        ...(shouldSendNotification && { notificationSentAt: new Date() }),
       },
     });
-
-    // 5. Enviar notificación por correo si es la primera vez
-    if (shouldSendNotification) {
-      try {
-        // Obtener todos los estudiantes matriculados (materia + grupo)
-        const allStudentIds = Array.from(new Set([
-          ...(classToUpdate.subject?.studentIds || []),
-          ...(classToUpdate.group?.studentIds || []),
-        ]));
-
-        const students = await db.user.findMany({
-          where: {
-            id: { in: allStudentIds },
-            role: 'ESTUDIANTE',
-            isActive: true,
-          },
-          select: {
-            id: true,
-            institutionalEmail: true,
-            name: true,
-          },
-        });
-
-        // Enviar correo a cada estudiante
-        const sendEmailPromises = students
-          .filter(
-            (
-              student
-            ): student is { id: string; institutionalEmail: string; name: string | null } =>
-              !!student.institutionalEmail
-          )
-          .map(async student => {
-            const justificationLink = `${process.env.NEXTAUTH_URL}/justificar-ausencia?classId=${classId}&studentId=${student.id}`;
-
-            await sendEmail({
-              to: student.institutionalEmail!,
-              subject: `Inicio de clase: ${classToUpdate.subject.name} - ${classToUpdate.topic || 'Sin tema específico'}`,
-              react: ClassNotifyEmail({
-                className: classToUpdate.topic || 'Sin tema específico',
-                subjectName: classToUpdate.subject.name,
-                startTime:
-                  classToUpdate.startTime?.toLocaleTimeString('es-ES', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }) || '--:--',
-                endTime:
-                  classToUpdate.endTime?.toLocaleTimeString('es-ES', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }) || '--:--',
-                date: classToUpdate.date.toISOString(),
-                justificationLink,
-                supportEmail: process.env.SUPPORT_EMAIL || 'soporte@fup.edu.co',
-                studentName: student.name || undefined,
-              }),
-            });
-          });
-
-        // Ejecutar todos los envíos en paralelo
-        await Promise.all(sendEmailPromises);
-      } catch (emailError) {
-        // No fallar la operación si hay error en el envío de correos
-      }
-    }
   } catch (error) {
     return NextResponse.json(
       { message: 'Error al guardar el token QR en la base de datos' },
@@ -158,13 +79,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
   }
 
   let baseUrl = process.env.NEXTAUTH_URL || 'https://sira-fup.online';
-  // Ensure the URL has a protocol
   if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
     baseUrl = `https://${baseUrl}`;
   }
   const qrUrl = `${baseUrl}/dashboard/estudiante/escanear/${token}`;
 
-  // Validar que el token cumple con los requisitos
   if (token.length !== 32) {
     return NextResponse.json(
       {
@@ -177,14 +96,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ cla
     );
   }
 
-  // Crear el objeto de respuesta
   const responseData = {
     qrUrl,
     qrToken: token,
     expiresAt: expiresAt.toISOString(),
   };
 
-  // Validar la respuesta contra el esquema
   const validation = GenerarQRResponseSchema.safeParse(responseData);
 
   if (!validation.success) {

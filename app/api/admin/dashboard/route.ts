@@ -58,7 +58,7 @@ export async function GET() {
       // Groups with student counts and subject info
       db.group.findMany({
         select: {
-          studentIds: true,
+          students: { select: { studentId: true } },
           subject: { select: { name: true, code: true } },
           room: { select: { name: true } },
         },
@@ -152,12 +152,12 @@ export async function GET() {
       const key = group.subject.code;
       const existing = subjectStudentMap.get(key);
       if (existing) {
-        group.studentIds.forEach(id => existing.students.add(id));
+        group.students.forEach(s => existing.students.add(s.studentId));
       } else {
         subjectStudentMap.set(key, {
           name: group.subject.name,
           code: group.subject.code,
-          students: new Set(group.studentIds),
+          students: new Set(group.students.map(s => s.studentId)),
         });
       }
     }

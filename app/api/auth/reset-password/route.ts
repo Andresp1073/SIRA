@@ -13,7 +13,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar longitud mínima de la contraseña
     if (password.length < 8) {
       return NextResponse.json(
         { message: 'La contraseña debe tener al menos 8 caracteres' },
@@ -21,12 +20,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Buscar usuario con el token de restablecimiento
     const user = await db.user.findFirst({
       where: {
         resetToken: token,
         resetTokenExpiry: {
-          gt: new Date(), // Verificar que el token no haya expirado
+          gt: new Date(),
         },
       },
     });
@@ -38,10 +36,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hashear la nueva contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Actualizar la contraseña y limpiar el token
     await db.user.update({
       where: { id: user.id },
       data: {
@@ -50,12 +46,6 @@ export async function POST(request: Request) {
         resetTokenExpiry: null,
       },
     });
-
-    // Invalidate user cache
-    const emails = [user.personalEmail, user.institutionalEmail].filter(Boolean) as string[];
-    // @ts-ignore - Dynamic import to avoid cycles or ensure availability
-    const { clearAllUserCache } = await import('@/lib/cache');
-    await clearAllUserCache(user.id, emails);
 
     return NextResponse.json(
       {

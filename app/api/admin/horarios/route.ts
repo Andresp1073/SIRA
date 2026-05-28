@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
         subject: { select: { name: true, code: true } },
         schedule: true,
         room: { select: { name: true } },
-        teachers: { select: { name: true } },
+        teachers: { include: { teacher: { select: { name: true } } } },
       },
       orderBy: { academicPeriod: 'desc' },
     });
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         startTime: g.schedule!.startTime,
         endTime: g.schedule!.endTime,
         roomName: g.room?.name ?? null,
-        teacherName: g.teachers[0]?.name ?? null,
+        teacherName: g.teachers[0]?.teacher?.name ?? null,
         academicPeriod: g.academicPeriod,
       }));
 

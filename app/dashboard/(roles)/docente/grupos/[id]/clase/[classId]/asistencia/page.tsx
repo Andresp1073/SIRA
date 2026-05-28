@@ -446,6 +446,7 @@ export default function AttendancePage() {
                         }
                       >
                         <SelectTrigger
+                          hideChevron
                           className={`w-[130px] h-8 rounded-full border-0 transition-colors font-medium text-xs ${statusInfo.bg} ${statusInfo.color}`}
                         >
                           <div className="flex items-center gap-2">

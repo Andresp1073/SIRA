@@ -12,12 +12,12 @@ export async function GET() {
 
     // Get ONLY the groups where student is directly enrolled (via Group.studentIds)
     const groups = await db.group.findMany({
-      where: { studentIds: { has: session.user.id } },
+      where: { students: { some: { studentId: session.user.id  } } },
       include: {
         subject: {
           select: { name: true, code: true, credits: true, program: true, semester: true },
         },
-        teachers: { select: { name: true } },
+        teachers: { include: { teacher: { select: { name: true } } } },
         schedule: { select: { dayOfWeek: true, startTime: true, endTime: true } },
         room: { select: { name: true } },
       },
